@@ -12,17 +12,14 @@ import java.net.HttpURLConnection;
 import java.net.ProtocolException;
 import java.net.MalformedURLException;
 
-import java.util.logging.Logger;
-
 import threads.Thread1;
+import threads.Thread2;
 
 /**
  *
  * @author erick
  */
 public class ApiRequest{
-    public static final Logger LOGGER=Logger.getLogger(Logger.GLOBAL_LOGGER_NAME);
-
     public InputStream getData(String link){
         try{
             URL u=new URL(link);
@@ -35,64 +32,40 @@ public class ApiRequest{
                 return null;
             }
         }catch(ProtocolException e){
-            LOGGER.config(e.fillInStackTrace().toString());
+            UtilityClass.LOGGER.config(e.fillInStackTrace().toString());
             return null;
         }catch(MalformedURLException x){
-            LOGGER.config(x.fillInStackTrace().toString());
+            UtilityClass.LOGGER.config(x.fillInStackTrace().toString());
             return null;
         }catch(IOException s){
-            LOGGER.config(s.fillInStackTrace().toString());
+            UtilityClass.LOGGER.config(s.fillInStackTrace().toString());
             return null;
         }
     }
 
     public String getNickname(String nickname){
         try{
-            InputStream is=getData("https://api.wotblitz.com/wotb/account/list/?application_id=fd14e112652ef853caa088328cd5a67d&search="+nickname);
-            String path=new UtilityClass().getPath("acc-data.json");
-            FileOutputStream fos=new FileOutputStream(path);
-            new Thread1(is,fos).run();
-
-            return path;
-        }catch(IOException e){
-            LOGGER.config(e.fillInStackTrace().toString());
-            return null;
+            return new Thread2().thread(getData("https://api.wotblitz.com/wotb/account/list/?application_id=fd14e112652ef853caa088328cd5a67d&search="+nickname));
         }catch(NullPointerException x){
-            LOGGER.config(x.fillInStackTrace().toString());
+            UtilityClass.LOGGER.config(x.fillInStackTrace().toString());
             return null;
         }
     }
 
     public String getTankData(int accId,int tankId){
         try{
-            InputStream is=getData("https://api.wotblitz.com/wotb/account/tankstats/?application_id=fd14e112652ef853caa088328cd5a67d&tank_id="+tankId+"&account_id="+accId);
-            String path=new UtilityClass().getPath("tank-data.json");
-            FileOutputStream fos=new FileOutputStream(path);
-            new Thread1(is,fos).run();
-
-            return path;
-        }catch(IOException e){
-            LOGGER.config(e.fillInStackTrace().toString());
-            return null;
+            return new Thread2().thread(getData("https://api.wotblitz.com/wotb/account/tankstats/?application_id=fd14e112652ef853caa088328cd5a67d&tank_id="+tankId+"&account_id="+accId));
         }catch(NullPointerException x){
-            LOGGER.config(x.fillInStackTrace().toString());
+            UtilityClass.LOGGER.config(x.fillInStackTrace().toString());
             return null;
         }
     }
 
     public String getTankIdData(){
         try{
-            InputStream is=getData("https://api.wotblitz.com/wotb/encyclopedia/vehicles/?application_id=fd14e112652ef853caa088328cd5a67d&fields=name%2Ctank_id%2Ctier");
-            String path=new UtilityClass().getPath("tankid-data.json");
-            FileOutputStream fos=new FileOutputStream(path);
-            new Thread1(is,fos).run();
-
-            return path;
-        }catch(IOException e){
-            LOGGER.config(e.fillInStackTrace().toString());
-            return null;
+            return new Thread2().thread(getData("https://api.wotblitz.com/wotb/encyclopedia/vehicles/?application_id=fd14e112652ef853caa088328cd5a67d&fields=name%2Ctank_id%2Ctier"));
         }catch(NullPointerException x){
-            LOGGER.config(x.fillInStackTrace().toString());
+            UtilityClass.LOGGER.config(x.fillInStackTrace().toString());
             return null;
         }
     }
@@ -100,16 +73,16 @@ public class ApiRequest{
     public String test(String link){
         try{
             InputStream is=getData(link);
-            String path=new UtilityClass().getPath("test.json");
+            String path=UtilityClass.getPath("test.json");
             FileOutputStream fos=new FileOutputStream(path);
             new Thread1(is,fos).run();
 
             return path;
         }catch(IOException e){
-            LOGGER.config(e.fillInStackTrace().toString());
+            UtilityClass.LOGGER.config(e.fillInStackTrace().toString());
             return null;
         }catch(NullPointerException x){
-            LOGGER.config(x.fillInStackTrace().toString());
+            UtilityClass.LOGGER.config(x.fillInStackTrace().toString());
             return null;
         }
     }
