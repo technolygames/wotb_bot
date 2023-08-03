@@ -1,5 +1,9 @@
 package mvc;
 
+/**
+ *
+ * @author erick
+ */
 public class Mvc1{
     String discordId;
     int wotbId;
