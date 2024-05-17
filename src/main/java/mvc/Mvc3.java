@@ -5,10 +5,19 @@ package mvc;
  * @author erick
  */
 public class Mvc3{
+    private int accountId;
     private int tankId;
     private int battleDifference;
     private int winDifference;
     private int lossDifference;
+
+    public int getAccountId(){
+        return accountId;
+    }
+
+    public void setAccountId(int accountId){
+        this.accountId=accountId;
+    }
 
     public int getTankId(){
         return tankId;
@@ -40,5 +49,10 @@ public class Mvc3{
 
     public void setLossDifference(int lossDifference){
         this.lossDifference=lossDifference;
+    }
+    
+    @Override
+    public String toString(){
+        return "Mvc3 [accountId="+accountId+", tankId="+tankId+", battleDifference="+battleDifference+", winDifference="+winDifference+", lossDifference="+lossDifference+"]";
     }
 }

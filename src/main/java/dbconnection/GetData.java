@@ -6,7 +6,6 @@ import java.sql.SQLException;
 
 import logic.UtilityClass;
 import mvc.Mvc1;
-import mvc.Mvc2;
 
 /**
  *
@@ -15,88 +14,90 @@ import mvc.Mvc2;
 public class GetData{
     private GetData(){}
 
-    private static PreparedStatement ps;
-    private static ResultSet rs;
-
     public static Mvc1 getUserData(String wotbId){
-        try{
-            ps=DbConnection.getConnection().prepareStatement("select * from user_data where wotb_id=?");
+        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("select * from user_data where wotb_id=?")){
             ps.setString(1,wotbId);
-            rs=ps.executeQuery();
+            ResultSet rs=ps.executeQuery();
 
             Mvc1 data=new Mvc1();
             while(rs.next()){
                 data.setDiscordId(rs.getString("discord_id"));
                 data.setWotbId(rs.getInt("wotb_id"));
                 data.setWotbName(rs.getString("wotb_name"));
+                data.setServer(rs.getString("realm"));
             }
 
             rs.close();
-            ps.close();
 
             return data;
         }catch(SQLException e){
-            UtilityClass.LOGGER.info(e.fillInStackTrace().toString());
+            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
             return null;
         }
     }
 
-    public static Mvc2 getTankStats(int tankId){
-        try{
-            ps=DbConnection.getConnection().prepareStatement("select * from tank_stats where tank_id=?");
-            ps.setInt(1,tankId);
-            rs=ps.executeQuery();
-
-            Mvc2 data=new Mvc2();
+    public static double getTierTenWinRate(int wotbId){
+        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("select sum(battles) as battles,sum(wins) as wins from tank_stats where tank_tier=10 and player_id=?")){
+            ps.setInt(1,wotbId);
+            ResultSet rs=ps.executeQuery();
+            double wr=0;
             while(rs.next()){
-                data.setPlayerId(rs.getInt("player_id"));
-                data.setTankId(rs.getInt("tank_id"));
-                data.setBattles(rs.getInt("battles"));
-                data.setWins(rs.getInt("wins"));
-                data.setLosses(rs.getInt("losses"));
+                wr=UtilityClass.getOverallWinrate(rs.getInt("wins"),rs.getInt("battles"));
             }
-
-            ps.close();
-            rs.close();
-
-            return data;
+            return wr;
         }catch(SQLException e){
-            UtilityClass.LOGGER.info(e.fillInStackTrace().toString());
-            return null;
+            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
+            return 0.0;
+        }
+    }
+
+    public static boolean isUpToOneThousandAndThreeHundredBattles(int wotbId){
+        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("select sum(battles) as battles from tank_stats where tank_tier=10 and player_id=?")){
+            ps.setInt(1,wotbId);
+            ResultSet rs=ps.executeQuery();
+            while(rs.next()){
+                if(rs.getInt("battles")>1300){
+                    return true;
+                }
+            }
+            return false;
+        }catch(SQLException e){
+            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
+            return false;
         }
     }
 
     public static boolean existUser(int wotbId){
-        try{
-            ps=DbConnection.getConnection().prepareStatement("select * from user_data where wotb_id=?");
+        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("select * from user_data where wotb_id=?")){
             ps.setInt(1,wotbId);
-            rs=ps.executeQuery();
+            ResultSet rs=ps.executeQuery();
             return rs.next();
         }catch(SQLException e){
-            UtilityClass.LOGGER.info(e.fillInStackTrace().toString());
+            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
             return false;
         }
     }
 
     public static boolean existTankRegister(int wotbId){
-        try{
-            ps=DbConnection.getConnection().prepareStatement("select * from tank_stats where player_id=?");
+        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("select * from tank_stats where player_id=?")){
             ps.setInt(1,wotbId);
-            rs=ps.executeQuery();
+            ResultSet rs=ps.executeQuery();
             return rs.next();
         }catch(SQLException e){
-            UtilityClass.LOGGER.info(e.fillInStackTrace().toString());
+            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
             return false;
         }
     }
 
-    public static ResultSet getTankList(){
-        try{
-            ps=DbConnection.getConnection().prepareStatement("select tank_id from tank_list where tank_tier=10;");
-            return ps.executeQuery();
+    public static boolean existTankData(int wotbId,int tankId){
+        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("select * from tank_stats where player_id=? and tank_id=?")){
+            ps.setInt(1,wotbId);
+            ps.setInt(2,tankId);
+            ResultSet rs=ps.executeQuery();
+            return rs.next();
         }catch(SQLException e){
-            UtilityClass.LOGGER.info(e.fillInStackTrace().toString());
-            return null;
+            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
+            return false;
         }
     }
 }

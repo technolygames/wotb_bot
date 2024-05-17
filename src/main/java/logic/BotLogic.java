@@ -1,160 +1,157 @@
 package logic;
 
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gson.JsonObject;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import dbconnection.GetData;
-import dbconnection.InsertData;
-import dbconnection.UpdateData;
-import mvc.Mvc1;
-import mvc.Mvc2;
-import mvc.Mvc3;
+import io.github.cdimascio.dotenv.Dotenv;
 
-/**
- *
- * @author erick
- */
+import net.dv8tion.jda.api.OnlineStatus;
+import net.dv8tion.jda.api.entities.Activity;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.channel.unions.MessageChannelUnion;
+import net.dv8tion.jda.api.events.guild.GuildReadyEvent;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.interactions.commands.OptionMapping;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
+import net.dv8tion.jda.api.interactions.commands.SlashCommandInteraction;
+import net.dv8tion.jda.api.interactions.commands.build.CommandData;
+import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.sharding.DefaultShardManagerBuilder;
+import net.dv8tion.jda.api.sharding.ShardManager;
+
 public class BotLogic{
-    public double getTournamentWinRate(){
-        int t10=400;
-        double w10=0.68;
-        int t9=400;
-        double w9=0.64;
-        int t8=200;
-        double w8=0.69;
-        int t7=200;
-        double w7=0.63;
-        int mloss=100;
-        double wloss=0;
-
-        int max=1300;
-
-        var val1=t10*w10;
-        var val2=0.95*t9*w9;
-        var val3=0.85*t8*w8;
-        var val4=0.75*t7*w7;
-        var val5=mloss*wloss;
-
-        var result1=val1+val2+val3+val4+val5/max;
-
-        return result1/10;
+    private final ShardManager sm;
+    public BotLogic(){
+        Dotenv token=Dotenv.configure().directory("data/.env").load();
+        DefaultShardManagerBuilder builder=DefaultShardManagerBuilder.createDefault(token.get("TOKEN"));
+        builder.setStatus(OnlineStatus.ONLINE);
+        builder.setActivity(Activity.playing("Testing"));
+        builder.enableIntents(GatewayIntent.MESSAGE_CONTENT,GatewayIntent.DIRECT_MESSAGES);
+        sm=builder.build();
+        sm.addEventListener(new EventListeners());
     }
 
-    public static double getWinRateValue(String json){
-        double wins=JsonHandler.getStatData(json).get("wins").getAsInt()+.0;
-        double battles=JsonHandler.getStatData(json).get("battles").getAsInt()+.0;
-
-        return Double.parseDouble(new DecimalFormat("##.##").format((wins/battles)*100));
-    }
-
-    public void registerPlayer(int wotbId,String nickname){
-        if(!GetData.existUser(wotbId)&&!GetData.existTankRegister(wotbId)){
-            var apiRequest=new ApiRequest();
-            JsonObject json=JsonHandler.getAccountData(apiRequest.getNickname(nickname));
-            JsonObject json2=JsonHandler.getTankStats(apiRequest.getTankData(json.get("account_id").getAsInt(),20257));
-
-            Mvc1 mvc=new Mvc1();
-            Mvc2 mvc2=new Mvc2();
-
-            mvc.setDiscordId("336722242887090178");
-            mvc.setWotbId(json.get("account_id").getAsInt());
-            mvc.setWotbName(json.get("nickname").getAsString());
-
-            mvc2.setPlayerId(mvc.getWotbId());
-            mvc2.setTankId(20257);
-            mvc2.setBattles(json2.get("battles").getAsInt());
-            mvc2.setWins(json2.get("wins").getAsInt());
-            mvc2.setLosses(json2.get("losses").getAsInt());
-
-            InsertData.setUserData(mvc);
-            InsertData.setTankStats(mvc2);
-
-            System.out.println("desde ahora, se registrarán los datos");
-        }
-    }
-
-    public void setTeamPlayers(){
-        
-    }
-
-    public void dataManipulation(List<Mvc2> dataFromApi,List<Mvc2> dataFromDatabase){
-        Mvc3 data=new Mvc3();
-        boolean found=false;
-
-        for(Mvc2 dataPoint1:dataFromApi){
-            int value1=dataPoint1.getBattles();
-            int value2=dataPoint1.getWins();
-            for(Mvc2 dataPoint2:dataFromDatabase){
-                if(dataPoint2.getBattles()!=value1){
-                    found=true;
-                    if(value2>=dataPoint2.getWins()&&dataPoint1.getLosses()>=dataPoint2.getLosses()){
-                        data.setTankId(dataFromApi.get(0).getTankId());
-                        data.setBattleDifference(calculateDifference(value1,dataPoint2.getBattles()));
-                        data.setWinDifference(calculateDifference(value2,dataPoint2.getWins()));
-                        data.setLossDifference(calculateDifference(dataPoint1.getLosses(),dataPoint2.getLosses()));
-                        System.out.println("se detectaron cambios");
+    private class EventListeners extends net.dv8tion.jda.api.hooks.ListenerAdapter{
+        @Override
+        public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent evt){
+            switch(evt.getName()){
+                case "register-user"->{
+                    String player=BotActions.registerPlayer(evt.getUser().getId(),evt.getOption("player").getAsString(),evt.getOption("server").getAsString());
+                    reply(evt,player);
+                }
+                case "team-stats"->{
+                    reply(evt,"Processing...");
+                    sendMessage(evt.getGuild(),evt.getChannel(),String.valueOf(BotActions.getTeamWinrate(evt.getOption("clan").getAsString(),evt.getOption("server").getAsString())+"%"));
+                }
+                case "team-registration"->{
+                    OptionMapping[] arrayOm={
+                        evt.getOption("player1"),
+                        evt.getOption("player2"),
+                        evt.getOption("player3"),
+                        evt.getOption("player4"),
+                        evt.getOption("player5"),
+                        evt.getOption("player6"),
+                        evt.getOption("player7"),
+                        evt.getOption("player8"),
+                        evt.getOption("player9"),
+                        evt.getOption("player10")
+                    };
+                    OptionMapping om=evt.getOption("clan");
+                    OptionMapping om2=evt.getOption("realm");
+                    for(OptionMapping optionMapping:arrayOm){
+                        int wotbId=JsonHandler.getAccountData(optionMapping.getAsString()).get("account_id").getAsInt();
+                        BotActions.teamRegistration(om.getAsString(),wotbId,optionMapping.getAsString(),om2.getAsString());
+                        JsonHandler.getAccTankData(wotbId);
                     }
-                    break;
+                    reply(evt,om.getAsString()+"' team, of the "+om2.getAsString()+" server, has been registered!");
                 }
-            }
-            if(found){
-                UpdateData.updateData(data);
+                case "personal-stats-tier10"->{
+                    OptionMapping om=evt.getOption("player");
+                    double val=BotActions.getPersonalTier10Stats(om.getAsString());
+                    if(val!=0.0){
+                        reply(evt,String.valueOf(val+"%"));
+                    }else{
+                        reply(evt,"No data");
+                    }
+                }
+                case "single-teammate-register"->{
+                    OptionMapping om=evt.getOption("player");
+                    OptionMapping om2=evt.getOption("clan");
+                    OptionMapping om3=evt.getOption("realm");
+                    int wotbId=JsonHandler.getAccountData(om.getAsString()).get("account_id").getAsInt();
+                    BotActions.teamRegistration(om2.getAsString(),wotbId,om.getAsString(),om3.getAsString());
+                    JsonHandler.getAccTankData(wotbId);
+                    reply(evt,om.getAsString()+" of the "+om2.getAsString()+" team, from "+om3.getAsString()+" server, has been registered!");
+                }
+                case "delete-teammate-register"->{
+                    OptionMapping om=evt.getOption("player");
+                    OptionMapping om2=evt.getOption("clan");
+                    OptionMapping om3=evt.getOption("realm");
+                    int wotbId=JsonHandler.getAccountData(om.getAsString()).get("account_id").getAsInt();
+                    BotActions.teamRegistration(om2.getAsString(),wotbId,om.getAsString(),om3.getAsString());
+                    JsonHandler.getAccTankData(wotbId);
+                    reply(evt,om.getAsString()+" of the "+om2.getAsString()+" team, from "+om3.getAsString()+" server, has been registered!");
+                }
+                default->{break;}
             }
         }
-    }
 
-    private List<Mvc2> filterData(List<Mvc2> data){
-        List<Mvc2> filteredData=new ArrayList<>();
-        int count=1300;
-        for(Mvc2 dataPoint:data){
-            int battles=dataPoint.getBattles();
-            int tier=dataPoint.getTier();
+        @Override
+        public void onGuildReady(@NotNull GuildReadyEvent evt){
+            List<CommandData> cd=new ArrayList<>();
+            List<OptionData> odl=new ArrayList<>();
 
-            if(count<battles){
-                if(tier>=8&&tier<=10){
-                    filteredData.add(dataPoint);
-                    count++;
-                }
-            }else{
-                break;
-            }
+            odl.add(new OptionData(OptionType.STRING,"player1","Set player 1st of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"player2","Set player 2nd of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"player3","Set player 3rd of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"player4","Set player 4th of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"player5","Set player 5th of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"player6","Set player 6th of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"player7","Set player 7th of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"player8","Set player 8th of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"player9","Set player 9th of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"player10","Set player 10th of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"clan","Set clantag of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"realm","Set team server",true));
+            cd.add(Commands.slash("team-registration","Register 10 players of a team").addOptions(odl));
+
+            odl=new ArrayList<>();
+            odl.add(new OptionData(OptionType.STRING,"clan","Team which will get stats",true));
+            odl.add(new OptionData(OptionType.STRING,"server","Server where team is created",true));
+            cd.add(Commands.slash("team-stats","Gets team stats").addOptions(odl));
+
+            odl=new ArrayList<>();
+            odl.add(new OptionData(OptionType.STRING,"player","Set  player to be register",true));
+            odl.add(new OptionData(OptionType.STRING,"clan","Set clantag of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"realm","Set team server",true));
+            cd.add(Commands.slash("single-teammate-register","Register a single teammate on a team").addOptions(odl));
+
+            odl=new ArrayList<>();
+            odl.add(new OptionData(OptionType.STRING,"player","Set  player to be register",true));
+            odl.add(new OptionData(OptionType.STRING,"clan","Set clantag of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"realm","Set team server",true));
+            cd.add(Commands.slash("delete-teammate-register","Delete a teammate register from team").addOptions(odl));
+
+            cd.add(Commands.slash("personal-stats-tier10","Gets player stats of tier 10").addOption(OptionType.STRING,"player","Gets player stats of tier 10",true));
+            
+            odl=new ArrayList<>();
+            odl.add(new OptionData(OptionType.STRING,"player","Register the user to record data",true));
+            odl.add(new OptionData(OptionType.STRING,"server","Set user server",true));
+            cd.add(Commands.slash("register-user","Register the user to record data").addOptions(odl));
+            evt.getGuild().updateCommands().addCommands(cd).complete();
         }
-        return filteredData;
-    }
 
-    public int calculateDifference(int fromApi,int fromDatabase){
-        return fromApi-fromDatabase;
-    }
+        private void sendMessage(Guild evt,MessageChannelUnion channel,String message){
+            evt.getTextChannelById(channel.getIdLong()).sendMessage(message).queue();
+        }
 
-    public Mvc2 retrieveFromApi(int tankId,String nickname){
-        Mvc2 data=new Mvc2();
-        var id=JsonHandler.getAccountData(new ApiRequest().getNickname(nickname)).get("account_id").getAsInt();
-        
-        var stats=JsonHandler.getTankStats(new ApiRequest().getTankData(id,tankId));
-
-        data.setPlayerId(id);
-        data.setTankId(tankId);
-        data.setBattles(stats.get("battles").getAsInt());
-        data.setWins(stats.get("wins").getAsInt());
-        data.setLosses(stats.get("losses").getAsInt());
-
-        return data;
-    }
-
-    public Mvc2 retrieveFromDatabase(int tankId){
-        var dbData=GetData.getTankStats(tankId);
-        Mvc2 data=new Mvc2();
-
-        data.setPlayerId(dbData.getPlayerId());
-        data.setTankId(dbData.getTankId());
-        data.setTier(dbData.getTier());
-        data.setBattles(dbData.getBattles());
-        data.setWins(dbData.getWins());
-        data.setLosses(dbData.getLosses());
-
-        return data;
+        private void reply(SlashCommandInteraction evt,String message){
+            evt.reply(message).setEphemeral(false).queue();
+        }
     }
 }

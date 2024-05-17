@@ -37,4 +37,9 @@ public class Mvc5{
     public void setTankTier(int tankTier){
         this.tankTier=tankTier;
     }
+
+    @Override
+    public String toString(){
+        return "Mvc5 [tankId="+tankId+", tankName="+tankName+", nation="+nation+", tankTier="+tankTier+"]";
+    }
 }

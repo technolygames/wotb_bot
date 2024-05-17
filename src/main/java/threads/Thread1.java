@@ -1,10 +1,10 @@
 package threads;
 
+import logic.UtilityClass;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-
-import logic.UtilityClass;
 
 /**
  *
@@ -27,7 +27,7 @@ public class Thread1 implements Runnable{
                 os.write(buffer,0,read);
             }
         }catch(IOException e){
-            UtilityClass.LOGGER.info(e.fillInStackTrace().toString());
+            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
         }
     }
 }

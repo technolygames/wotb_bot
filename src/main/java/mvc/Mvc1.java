@@ -8,6 +8,7 @@ public class Mvc1{
     String discordId;
     int wotbId;
     String wotbName;
+    String server;
 
     public String getDiscordId(){
         return discordId;
@@ -31,6 +32,14 @@ public class Mvc1{
 
     public void setWotbName(String wotbName){
         this.wotbName=wotbName;
+    }
+
+    public String getServer(){
+        return server;
+    }
+
+    public void setServer(String server){
+        this.server=server;
     }
 
     @Override

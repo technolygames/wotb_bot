@@ -1,13 +1,15 @@
 package dbconnection;
 
+import logic.UtilityClass;
+
 import java.io.IOException;
 import java.io.FileInputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.DriverManager;
 import java.util.Properties;
 
-import logic.UtilityClass;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 /**
  *
@@ -16,25 +18,37 @@ import logic.UtilityClass;
 public class DbConnection{
     private DbConnection(){}
 
-    public static Connection getConnection(){
+    private static HikariDataSource ds;
+
+    static{
         Properties p=new Properties();
+        HikariConfig config=new HikariConfig();
         try{
             p.load(new FileInputStream("data/config.properties"));
-            String database=p.getProperty("database");
-            String server=p.getProperty("server");
-            String port=p.getProperty("port");
-            String user=p.getProperty("user");
-            String pass=p.getProperty("pass");
-
-            return DriverManager.getConnection("jdbc:mysql://"+server+":"+port+"/"+database+"?serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8",user,pass);
-        }catch(SQLException e){
-            UtilityClass.LOGGER.info(e.fillInStackTrace().toString());
-            return null;
+            config.setJdbcUrl("jdbc:mysql://"+p.getProperty("server")+":"+p.getProperty("port")+"/"+p.getProperty("database")+"?serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8");
+            config.setUsername(p.getProperty("user"));
+            config.setPassword(p.getProperty("pass"));
+            config.addDataSourceProperty("cachePrepStmts","true");
+            config.addDataSourceProperty("prepStmtCacheSize","256");
+            config.addDataSourceProperty("prepStmtCacheSqlLimit","2048");
+            config.setMaximumPoolSize(600);
+            ds=new HikariDataSource(config);
         }catch(IOException x){
-            UtilityClass.LOGGER.info(x.fillInStackTrace().toString());
+            UtilityClass.LOGGER.severe(x.fillInStackTrace().toString());
+        }
+    }
+
+    public static Connection getConnection(){
+        try{
+            return ds.getConnection();
+        }catch(SQLException e){
+            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
             return null;
         }catch(NullPointerException s){
-            UtilityClass.LOGGER.info(s.fillInStackTrace().toString());
+            UtilityClass.LOGGER.severe(s.fillInStackTrace().toString());
+            return null;
+        }catch(Exception n){
+            UtilityClass.LOGGER.severe(n.fillInStackTrace().toString());
             return null;
         }
     }

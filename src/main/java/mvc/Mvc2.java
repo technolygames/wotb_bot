@@ -7,7 +7,7 @@ package mvc;
 public class Mvc2{
     private int playerId;
     private int tankId;
-    private int tier;
+    private int tankTier;
     private int battles;
     private int wins;
     private int losses;
@@ -28,12 +28,12 @@ public class Mvc2{
         this.tankId=tankId;
     }
 
-    public int getTier(){
-        return tier;
+    public int getTankTier(){
+        return tankTier;
     }
 
-    public void setTier(int tier){
-        this.tier=tier;
+    public void setTankTier(int tankTier){
+        this.tankTier=tankTier;
     }
 
     public int getBattles(){
@@ -58,5 +58,10 @@ public class Mvc2{
 
     public void setLosses(int losses){
         this.losses=losses;
+    }
+
+    @Override
+    public String toString(){
+        return "Mvc2 [playerId="+playerId+", tankId="+tankId+", tank_tier="+tankTier+", battles="+battles+", wins="+wins+", losses="+losses+"]";
     }
 }

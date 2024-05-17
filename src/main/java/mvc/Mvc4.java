@@ -46,4 +46,9 @@ public class Mvc4{
     public void setWinrate(double winrate){
         this.winrate=winrate;
     }
+
+    @Override
+    public String toString(){
+        return "Mvc4 [wotbId="+wotbId+", tierTank="+tierTank+", battles="+battles+", wins="+wins+", winrate="+winrate+"]";
+    }
 }
