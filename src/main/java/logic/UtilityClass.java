@@ -114,6 +114,6 @@ public class UtilityClass{
     }
 
     private static String getAppID(){
-        return Dotenv.configure().directory("data/.env").load().get("APP_ID");
+        return Dotenv.configure().directory(".env").load().get("APP_ID");
     }
 }

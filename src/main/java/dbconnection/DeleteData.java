@@ -21,10 +21,11 @@ public class DeleteData{
             UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
         }
     }
-
-    public static void deleteTanksByTier(int tier){
-        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("delete from tank_stats where tank_tier=?")){
-            ps.setInt(1,tier);
+    
+    public static void deletePlayerFromTeamList(String nickname,String clantag){
+        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("delete from team where wotb_name=? and clantag=?")){
+            ps.setString(1,nickname);
+            ps.setString(2,clantag);
 
             ps.execute();
         }catch(SQLException e){
@@ -32,9 +33,10 @@ public class DeleteData{
         }
     }
 
-    public static void deletePlayerFromTeamList(String nickname){
-        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("delete from team where wotb_name=?")){
-            ps.setString(1,nickname);
+    public static void deleteTeam(String clantag,String realm){
+        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("delete from team where clantag=? and realm=?")){
+            ps.setString(1,clantag);
+            ps.setString(2,realm);
 
             ps.execute();
         }catch(SQLException e){

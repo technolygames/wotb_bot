@@ -2,7 +2,6 @@ package dbconnection;
 
 import logic.UtilityClass;
 import mvc.Mvc1;
-import mvc.Mvc2;
 
 import java.sql.SQLException;
 import java.sql.PreparedStatement;
@@ -21,21 +20,6 @@ public class InsertData{
             ps.setString(3,data.getWotbName());
             ps.setString(4,data.getServer());
             
-            ps.execute();
-        }catch(SQLException e){
-            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
-        }
-    }
-
-    public static void setTankStats(Mvc2 data){
-        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("insert into tank_stats values(?,?,?,?,?,?)")){
-            ps.setInt(1,data.getPlayerId());
-            ps.setInt(2,data.getTankId());
-            ps.setInt(3,data.getTankTier());
-            ps.setInt(4,data.getBattles());
-            ps.setInt(5,data.getWins());
-            ps.setInt(6,data.getLosses());
-
             ps.execute();
         }catch(SQLException e){
             UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());

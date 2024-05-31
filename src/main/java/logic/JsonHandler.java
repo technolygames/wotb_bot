@@ -10,7 +10,6 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
-import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -36,7 +35,7 @@ public class JsonHandler{
      * Gets account data from Wg's api.<br>
      * Data returned from Wg's api is in-game name and user ID.<br>
      * Method used to get this values is getNickname().
-     * 
+     * @param nickname
      * @return in-game name and user ID used to get info from the api.
     */
     public static JsonObject getAccountData(String nickname){
@@ -61,52 +60,48 @@ public class JsonHandler{
     public static void getAccTankData(int accId){
         try(var cn=DbConnection.getConnection();
         PreparedStatement ps=cn.prepareStatement("insert into tank_stats values(?,?,?,?,?,?)");
-        PreparedStatement ps2=cn.prepareStatement("select * from tank_stats where player_id=? and tank_id=?");
-        PreparedStatement ps3=cn.prepareStatement("select * from tank_list");
+        PreparedStatement ps2=cn.prepareStatement("select tank_id from tank_stats where wotb_id=? and tank_id=?");
+        PreparedStatement ps3=cn.prepareStatement("select tank_tier from tank_list where tank_id=?");
         PreparedStatement ps4=cn.prepareStatement("update tank_stats set tank_tier=? where tank_id=?");
         PreparedStatement ps5=cn.prepareStatement("delete from tank_stats where tank_tier<=0")){
             je=JsonParser.parseString(new Thread2().thread(ApiRequest.getData("https://api.wotblitz.com/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=all%2Ctank_id%2Clast_battle_time")));
             gson=new GsonBuilder().create();
 
-            new Thread(()->{
-                var text=gson.toJsonTree(je).getAsJsonObject().getAsJsonObject("data");
-                var val=UtilityClass.getJsonKeyName(text.keySet());
-                var text2=text.getAsJsonArray(val);
-                for(var val2:text2){
-                    var val3=val2.getAsJsonObject();
-                    var val4=val3.getAsJsonObject("all");
+            var text=gson.toJsonTree(je).getAsJsonObject().getAsJsonObject("data");
+            var text2=text.getAsJsonArray(UtilityClass.getJsonKeyName(text.keySet()));
+            for(var val2:text2){
+                var val3=val2.getAsJsonObject();
+                var val4=val3.getAsJsonObject("all");
+                var tankId=val3.get("tank_id").getAsInt();
 
-                    String lit1="tank_id";
-                    var tankId=val3.get(lit1).getAsInt();
-                    try{
-                        ps2.setInt(1,accId);
-                        ps2.setInt(2,tankId);
-                        ResultSet rs=ps2.executeQuery();
-                        ResultSet rs2=ps3.executeQuery();
-                        if(!rs.next()){
-                            ps.setInt(1,Integer.parseInt(val));
-                            ps.setInt(2,tankId);
-                            ps.setInt(3,0);
-                            ps.setInt(4,val4.get("battles").getAsInt());
-                            ps.setInt(5,val4.get("wins").getAsInt());
-                            ps.setInt(6,val4.get("losses").getAsInt());
-                            ps.execute();
+                ps2.setInt(1,accId);
+                ps2.setInt(2,tankId);
+                ps3.setInt(1,tankId);
+                ResultSet rs=ps2.executeQuery();
+                ResultSet rs2=ps3.executeQuery();
+                if(!rs.next()){
+                    ps.setInt(1,accId);
+                    ps.setInt(2,tankId);
+                    ps.setInt(3,0);
+                    ps.setInt(4,val4.get("battles").getAsInt());
+                    ps.setInt(5,val4.get("wins").getAsInt());
+                    ps.setInt(6,val4.get("losses").getAsInt());
+                    ps.addBatch();
+                    ps.executeBatch();
 
-                            while(rs2.next()){
-                                ps4.setInt(1,rs2.getInt("tank_tier"));
-                                ps4.setInt(2,rs2.getInt(lit1));
-                                ps4.execute();
-                            }
-
-                            ps5.execute();
-                        }
-                    }catch(SQLException e){
-                        UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
+                    while(rs2.next()){
+                        ps4.setInt(1,rs2.getInt("tank_tier"));
+                        ps4.setInt(2,tankId);
+                        ps4.addBatch();
+                        ps4.executeBatch();
                     }
+
+                    ps5.execute();
                 }
-            });
+            }
         }catch(SQLException e){
             UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
+            e.printStackTrace();
         }catch(IllegalStateException x){
             UtilityClass.LOGGER.severe(x.fillInStackTrace().toString());
         }
@@ -115,13 +110,11 @@ public class JsonHandler{
     /**
      * 
      * @param accId
-     * @return
      */
     public static void dataManipulation(int accId){
         try(var cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("select * from tank_stats where player_id=?");
-        PreparedStatement ps2=cn.prepareStatement("update tank_stats set battles=battles+?, wins=wins+?, losses=losses+? where player_id=? and tank_id=?");
-        PreparedStatement ps3=cn.prepareStatement("insert into tank_stats values(?,?,?,?,?,?)")){
+        PreparedStatement ps=cn.prepareStatement("select tank_id,battles,wins,losses from tank_stats where wotb_id=?");
+        PreparedStatement ps2=cn.prepareStatement("update tank_stats set battles=battles+?, wins=wins+?, losses=losses+? where wotb_id=? and tank_id=?")){
             ps.setInt(1,accId);
             ResultSet rs=ps.executeQuery();
 
@@ -157,7 +150,8 @@ public class JsonHandler{
                             ps2.setInt(4,accId);
                             ps2.setInt(5,value4);
 
-                            ps2.execute();
+                            ps2.addBatch();
+                            ps2.executeBatch();
                         }
                         break;
                     }
@@ -165,11 +159,15 @@ public class JsonHandler{
             }
         }catch(SQLException e){
             UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
+            e.printStackTrace();
         }catch(IllegalStateException x){
             UtilityClass.LOGGER.severe(x.fillInStackTrace().toString());
         }
     }
 
+    /**
+     * @param wotbId
+    */
     public static void updatePlayerNickname(int wotbId){
         try(var cn=DbConnection.getConnection();
         PreparedStatement ps=cn.prepareStatement("select wotb_name from user_data where wotb_id=?");
@@ -213,7 +211,7 @@ public class JsonHandler{
     public static void getTankInfo(){
         try(var cn=DbConnection.getConnection();
         PreparedStatement ps=cn.prepareStatement("insert into tank_list values(?,?,?,?)");
-        PreparedStatement ps2=cn.prepareStatement("select * from tank_list where tank_id=?")){
+        PreparedStatement ps2=cn.prepareStatement("select tank_name from tank_list where tank_id=?")){
             je=JsonParser.parseString(new Thread2().thread(ApiRequest.getData("https://api.wotblitz.com/wotb/encyclopedia/vehicles/?application_id="+UtilityClass.APP_ID+"&fields=tank_id%2Ctier%2Cnation%2Cname")));
             gson=new GsonBuilder().create();
 

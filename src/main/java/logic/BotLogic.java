@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
+import dbconnection.DeleteData;
 import io.github.cdimascio.dotenv.Dotenv;
 
 import net.dv8tion.jda.api.OnlineStatus;
@@ -27,7 +27,7 @@ import net.dv8tion.jda.api.sharding.ShardManager;
 public class BotLogic{
     private final ShardManager sm;
     public BotLogic(){
-        Dotenv token=Dotenv.configure().directory("data/.env").load();
+        Dotenv token=Dotenv.configure().directory(".env").load();
         DefaultShardManagerBuilder builder=DefaultShardManagerBuilder.createDefault(token.get("TOKEN"));
         builder.setStatus(OnlineStatus.ONLINE);
         builder.setActivity(Activity.playing("Testing"));
@@ -41,14 +41,34 @@ public class BotLogic{
         public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent evt){
             switch(evt.getName()){
                 case "register-user"->{
-                    String player=BotActions.registerPlayer(evt.getUser().getId(),evt.getOption("player").getAsString(),evt.getOption("server").getAsString());
-                    reply(evt,player);
+                    reply(evt);
+                    String player=BotActions.registerPlayer(evt.getUser().getId(),evt.getOption("player1").getAsString(),evt.getOption("server1").getAsString());
+                    sendMessage(evt.getGuild(),evt.getChannel(),player);
+                }
+                case "personal-stats-tier10"->{
+                    reply(evt);
+                    OptionMapping om=evt.getOption("player2");
+                    double val=BotActions.getPersonalTier10Stats(om.getAsString());
+                    if(val!=0.0){
+                        sendMessage(evt.getGuild(),evt.getChannel(),"Your tier X win rate is: "+String.valueOf(val+"%"));
+                    }else{
+                        sendMessage(evt.getGuild(),evt.getChannel(),"No data");
+                    }
                 }
                 case "team-stats"->{
-                    reply(evt,"Processing...");
-                    sendMessage(evt.getGuild(),evt.getChannel(),String.valueOf(BotActions.getTeamWinrate(evt.getOption("clan").getAsString(),evt.getOption("server").getAsString())+"%"));
+                    reply(evt);
+                    double val=BotActions.getTeamWinrate(evt.getOption("clantag3").getAsString(),evt.getOption("realm3").getAsString());
+                    sendMessage(evt.getGuild(),evt.getChannel(),String.valueOf("Original: "+val+"%, Wargaming's page: "+Math.round(val)+"%"));
+                }
+                case "roster"->{
+                    reply(evt);
+                    String clantag=evt.getOption("clantag").getAsString();
+                    String realm=evt.getOption("realm").getAsString();
+                    double val=BotActions.getTeamWinrate(clantag,realm);
+                    sendMessage(evt.getGuild(),evt.getChannel(),"Team Roster (original: "+val+"%, Wargaming's page: "+Math.round(val)+"%): \n"+BotActions.getRoster(clantag,realm));
                 }
                 case "team-registration"->{
+                    reply(evt);
                     OptionMapping[] arrayOm={
                         evt.getOption("player1"),
                         evt.getOption("player2"),
@@ -61,41 +81,34 @@ public class BotLogic{
                         evt.getOption("player9"),
                         evt.getOption("player10")
                     };
-                    OptionMapping om=evt.getOption("clan");
-                    OptionMapping om2=evt.getOption("realm");
+                    OptionMapping om=evt.getOption("clantag4");
+                    OptionMapping om2=evt.getOption("realm4");
+                    sendMessage(evt.getGuild(),evt.getChannel(),om.getAsString()+"' team, of the "+om2.getAsString()+" server, has been registered!");
                     for(OptionMapping optionMapping:arrayOm){
                         int wotbId=JsonHandler.getAccountData(optionMapping.getAsString()).get("account_id").getAsInt();
                         BotActions.teamRegistration(om.getAsString(),wotbId,optionMapping.getAsString(),om2.getAsString());
                         JsonHandler.getAccTankData(wotbId);
                     }
-                    reply(evt,om.getAsString()+"' team, of the "+om2.getAsString()+" server, has been registered!");
-                }
-                case "personal-stats-tier10"->{
-                    OptionMapping om=evt.getOption("player");
-                    double val=BotActions.getPersonalTier10Stats(om.getAsString());
-                    if(val!=0.0){
-                        reply(evt,String.valueOf(val+"%"));
-                    }else{
-                        reply(evt,"No data");
-                    }
                 }
                 case "single-teammate-register"->{
-                    OptionMapping om=evt.getOption("player");
-                    OptionMapping om2=evt.getOption("clan");
-                    OptionMapping om3=evt.getOption("realm");
+                    reply(evt);
+                    OptionMapping om=evt.getOption("player5");
+                    OptionMapping om2=evt.getOption("clantag5");
+                    OptionMapping om3=evt.getOption("server5");
                     int wotbId=JsonHandler.getAccountData(om.getAsString()).get("account_id").getAsInt();
                     BotActions.teamRegistration(om2.getAsString(),wotbId,om.getAsString(),om3.getAsString());
                     JsonHandler.getAccTankData(wotbId);
-                    reply(evt,om.getAsString()+" of the "+om2.getAsString()+" team, from "+om3.getAsString()+" server, has been registered!");
+                    sendMessage(evt.getGuild(),evt.getChannel(),om.getAsString()+" of the "+om2.getAsString()+" team, from "+om3.getAsString()+" server, has been registered!");
                 }
-                case "delete-teammate-register"->{
-                    OptionMapping om=evt.getOption("player");
-                    OptionMapping om2=evt.getOption("clan");
-                    OptionMapping om3=evt.getOption("realm");
-                    int wotbId=JsonHandler.getAccountData(om.getAsString()).get("account_id").getAsInt();
-                    BotActions.teamRegistration(om2.getAsString(),wotbId,om.getAsString(),om3.getAsString());
-                    JsonHandler.getAccTankData(wotbId);
-                    reply(evt,om.getAsString()+" of the "+om2.getAsString()+" team, from "+om3.getAsString()+" server, has been registered!");
+                case "delete-team-registry"->{
+                    reply(evt);
+                    DeleteData.deleteTeam(evt.getOption("clantag6").getAsString(),evt.getOption("server6").getAsString());
+                }
+                case "delete-teammate-registry"->{
+                    reply(evt);
+                    OptionMapping om=evt.getOption("player7");
+                    DeleteData.deletePlayerFromTeamList(om.getAsString(),evt.getOption("clantag7").getAsString());
+                    sendMessage(evt.getGuild(),evt.getChannel(),om.getAsString()+" has been deleted successfully!");
                 }
                 default->{break;}
             }
@@ -106,6 +119,25 @@ public class BotLogic{
             List<CommandData> cd=new ArrayList<>();
             List<OptionData> odl=new ArrayList<>();
 
+            odl.add(new OptionData(OptionType.STRING,"player1","Register the user to record data",true));
+            odl.add(new OptionData(OptionType.STRING,"server1","Set user server",true));
+            cd.add(Commands.slash("register-user","Register the user to record data").addOptions(odl));
+
+            cd.add(Commands.slash("personal-stats-tier10","Gets player stats of tier 10").addOption(OptionType.STRING,"player2","Gets player stats of tier 10",true));
+
+            odl=new ArrayList<>();
+            odl.add(new OptionData(OptionType.STRING,"clantag3","Team which will get stats",true));
+            odl.add(new OptionData(OptionType.STRING,"realm3","Server where team is created",true));
+            cd.add(Commands.slash("team-stats","Gets team stats").addOptions(odl));
+
+            odl=new ArrayList<>();
+            odl.add(new OptionData(OptionType.STRING,"clantag","Team which gets team roster",true));
+            odl.add(new OptionData(OptionType.STRING,"realm","Server where team is created",true));
+            cd.add(Commands.slash("roster","Get team structure").addOptions(odl));
+
+            odl=new ArrayList<>();
+            odl.add(new OptionData(OptionType.STRING,"clantag4","Set clantag of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"realm4","Set team server",true));
             odl.add(new OptionData(OptionType.STRING,"player1","Set player 1st of the team",true));
             odl.add(new OptionData(OptionType.STRING,"player2","Set player 2nd of the team",true));
             odl.add(new OptionData(OptionType.STRING,"player3","Set player 3rd of the team",true));
@@ -113,36 +145,27 @@ public class BotLogic{
             odl.add(new OptionData(OptionType.STRING,"player5","Set player 5th of the team",true));
             odl.add(new OptionData(OptionType.STRING,"player6","Set player 6th of the team",true));
             odl.add(new OptionData(OptionType.STRING,"player7","Set player 7th of the team",true));
-            odl.add(new OptionData(OptionType.STRING,"player8","Set player 8th of the team",true));
-            odl.add(new OptionData(OptionType.STRING,"player9","Set player 9th of the team",true));
-            odl.add(new OptionData(OptionType.STRING,"player10","Set player 10th of the team",true));
-            odl.add(new OptionData(OptionType.STRING,"clan","Set clantag of the team",true));
-            odl.add(new OptionData(OptionType.STRING,"realm","Set team server",true));
-            cd.add(Commands.slash("team-registration","Register 10 players of a team").addOptions(odl));
+            odl.add(new OptionData(OptionType.STRING,"player8","Set player 8th of the team",false));
+            odl.add(new OptionData(OptionType.STRING,"player9","Set player 9th of the team",false));
+            odl.add(new OptionData(OptionType.STRING,"player10","Set player 10th of the team",false));
+            cd.add(Commands.slash("team-registration","Register a team for statistic tracking").addOptions(odl));
 
             odl=new ArrayList<>();
-            odl.add(new OptionData(OptionType.STRING,"clan","Team which will get stats",true));
-            odl.add(new OptionData(OptionType.STRING,"server","Server where team is created",true));
-            cd.add(Commands.slash("team-stats","Gets team stats").addOptions(odl));
-
-            odl=new ArrayList<>();
-            odl.add(new OptionData(OptionType.STRING,"player","Set  player to be register",true));
-            odl.add(new OptionData(OptionType.STRING,"clan","Set clantag of the team",true));
-            odl.add(new OptionData(OptionType.STRING,"realm","Set team server",true));
+            odl.add(new OptionData(OptionType.STRING,"player5","Set  player to be register",true));
+            odl.add(new OptionData(OptionType.STRING,"clantag5","Set clantag of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"server5","Set team server",true));
             cd.add(Commands.slash("single-teammate-register","Register a single teammate on a team").addOptions(odl));
 
             odl=new ArrayList<>();
-            odl.add(new OptionData(OptionType.STRING,"player","Set  player to be register",true));
-            odl.add(new OptionData(OptionType.STRING,"clan","Set clantag of the team",true));
-            odl.add(new OptionData(OptionType.STRING,"realm","Set team server",true));
-            cd.add(Commands.slash("delete-teammate-register","Delete a teammate register from team").addOptions(odl));
+            odl.add(new OptionData(OptionType.STRING,"clantag6","Set clantag of the team",true));
+            odl.add(new OptionData(OptionType.STRING,"server6","Set team server",true));
+            cd.add(Commands.slash("delete-team-registry","Delete a team registry").addOptions(odl));
 
-            cd.add(Commands.slash("personal-stats-tier10","Gets player stats of tier 10").addOption(OptionType.STRING,"player","Gets player stats of tier 10",true));
-            
             odl=new ArrayList<>();
-            odl.add(new OptionData(OptionType.STRING,"player","Register the user to record data",true));
-            odl.add(new OptionData(OptionType.STRING,"server","Set user server",true));
-            cd.add(Commands.slash("register-user","Register the user to record data").addOptions(odl));
+            odl.add(new OptionData(OptionType.STRING,"player7","Set  player to be deleted",true));
+            odl.add(new OptionData(OptionType.STRING,"clantag7","Set clantag of the team",true));
+            cd.add(Commands.slash("delete-teammate-registry","Delete a teammate register from team").addOptions(odl));
+
             evt.getGuild().updateCommands().addCommands(cd).complete();
         }
 
@@ -150,8 +173,8 @@ public class BotLogic{
             evt.getTextChannelById(channel.getIdLong()).sendMessage(message).queue();
         }
 
-        private void reply(SlashCommandInteraction evt,String message){
-            evt.reply(message).setEphemeral(false).queue();
+        private void reply(SlashCommandInteraction evt){
+            evt.reply("Processing...").setEphemeral(true).queue();
         }
     }
 }
