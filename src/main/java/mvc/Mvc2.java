@@ -5,19 +5,18 @@ package mvc;
  * @author erick
  */
 public class Mvc2{
-    private int playerId;
+    private int wotbId;
     private int tankId;
-    private int tankTier;
-    private int battles;
-    private int wins;
-    private int losses;
+    private int battleDifference;
+    private int winDifference;
+    private int lossDifference;
 
-    public int getPlayerId(){
-        return playerId;
+    public int getWotbId(){
+        return wotbId;
     }
 
-    public void setPlayerId(int playerId){
-        this.playerId=playerId;
+    public void setWotbId(int wotbId){
+        this.wotbId=wotbId;
     }
 
     public int getTankId(){
@@ -28,40 +27,32 @@ public class Mvc2{
         this.tankId=tankId;
     }
 
-    public int getTankTier(){
-        return tankTier;
+    public int getBattleDifference(){
+        return battleDifference;
     }
 
-    public void setTankTier(int tankTier){
-        this.tankTier=tankTier;
+    public void setBattleDifference(int battleDifference){
+        this.battleDifference=battleDifference;
     }
 
-    public int getBattles(){
-        return battles;
+    public int getWinDifference(){
+        return winDifference;
     }
 
-    public void setBattles(int battles){
-        this.battles=battles;
+    public void setWinDifference(int winDifference){
+        this.winDifference=winDifference;
     }
 
-    public int getWins(){
-        return wins;
+    public int getLossDifference(){
+        return lossDifference;
     }
 
-    public void setWins(int wins){
-        this.wins=wins;
+    public void setLossDifference(int lossDifference){
+        this.lossDifference=lossDifference;
     }
-
-    public int getLosses(){
-        return losses;
-    }
-
-    public void setLosses(int losses){
-        this.losses=losses;
-    }
-
+    
     @Override
     public String toString(){
-        return "Mvc2 [playerId="+playerId+", tankId="+tankId+", tank_tier="+tankTier+", battles="+battles+", wins="+wins+", losses="+losses+"]";
+        return "Mvc3 [accountId="+wotbId+", tankId="+tankId+", battleDifference="+battleDifference+", winDifference="+winDifference+", lossDifference="+lossDifference+"]";
     }
 }

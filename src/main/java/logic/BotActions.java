@@ -1,9 +1,6 @@
 package logic;
 
 import dbconnection.DbConnection;
-import dbconnection.GetData;
-import dbconnection.InsertData;
-import mvc.Mvc1;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -12,8 +9,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.sql.PreparedStatement;
-
-import com.google.gson.JsonObject;
 
 /**
  * 
@@ -67,33 +62,6 @@ public class BotActions{
             return 0.0;
         }
     }
-    
-    /**
-     * Register a player into the database from the API.
-     * @param discordId ID retrieved by JDA.
-     * @param nickname of the player to request to the API.
-     * @param server where the user is located.
-     * @return returns a string if a player is registered into the database or not.
-    */
-    public static String registerPlayer(String discordId,String nickname,String server){
-        JsonObject json=JsonHandler.getAccountData(nickname);
-        
-        Mvc1 mvc=new Mvc1();
-        
-        int wotbId=json.get("account_id").getAsInt();
-        mvc.setDiscordId(discordId);
-        mvc.setWotbId(wotbId);
-        mvc.setWotbName(json.get("nickname").getAsString());
-        mvc.setServer(server);
-
-        if(!GetData.existUser(mvc.getWotbId())){
-            InsertData.setUserData(mvc);
-            JsonHandler.getAccTankData(wotbId);
-            return "Player registered";
-        }else{
-            return "Player is already registered";
-        }
-    }
 
     /**
      * @param clantag
@@ -101,12 +69,14 @@ public class BotActions{
      * @param nickname
      * @param realm
      */
-    public static void teamRegistration(String clantag,int wotbId,String nickname,String realm){
-        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("insert into team values(?,?,?,?)")){
+    public static void teamRegistration(String clantag,String discordId,int wotbId,String nickname,String realm){
+        try(var cn=DbConnection.getConnection();
+            PreparedStatement ps=cn.prepareStatement("insert into team values(?,?,?,?,?)")){
             ps.setString(1,clantag);
-            ps.setInt(2,wotbId);
-            ps.setString(3,nickname);
-            ps.setString(4,realm);
+            ps.setString(2,discordId);
+            ps.setInt(3,wotbId);
+            ps.setString(4,nickname);
+            ps.setString(5,realm);
             ps.addBatch();
             ps.executeBatch();
         }catch(SQLException e){
@@ -120,10 +90,9 @@ public class BotActions{
      */
     public static double getPersonalTier10Stats(String nickname){
         try (var cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("select wotb_id from user_data where wotb_name=? union select wotb_id from team where wotb_name=?");
+        PreparedStatement ps=cn.prepareStatement("select wotb_id from team where wotb_name=?");
         PreparedStatement ps2=cn.prepareStatement("select sum(wins) as wins, sum(battles) as battles from tank_stats where wotb_id=?")) {
             ps.setString(1,nickname);
-            ps.setString(2,nickname);
             ResultSet rs=ps.executeQuery();
             double wins=0.0;
             while(rs.next()){

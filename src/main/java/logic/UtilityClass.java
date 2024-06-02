@@ -3,14 +3,18 @@ package logic;
 import threads.Thread1;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.io.FileOutputStream;
 import java.time.ZoneId;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+import java.util.Properties;
 import java.util.Set;
 
 import java.util.logging.Logger;
@@ -110,10 +114,21 @@ public class UtilityClass{
         double wins2=wins+.0;
         double battles2=battles+.0;
 
-        return getFormattedDouble((wins2/battles2)*100);
+        return getFormattedDouble(Double.parseDouble(String.valueOf((wins2/battles2)*100).replace(",", ".")));
     }
 
     private static String getAppID(){
-        return Dotenv.configure().directory(".env").load().get("APP_ID");
+        return Dotenv.configure().directory("data").load().get("APP_ID");
+    }
+
+    public static String getRealm(String realm){
+        Properties p=new Properties();
+        try{
+            p.load(new FileInputStream("data/realms.properties"));
+            return p.getProperty(realm);
+        }catch(IOException e){
+            LOGGER.severe(e.fillInStackTrace().toString());
+            return "NA";
+        }
     }
 }

@@ -1,58 +1,54 @@
 package mvc;
 
-/**
- *
- * @author erick
- */
 public class Mvc3{
-    private int accountId;
-    private int tankId;
-    private int battleDifference;
-    private int winDifference;
-    private int lossDifference;
+    private int wotbId;
+    private int tierTank;
+    private int battles;
+    private int wins;
+    private double winrate;
 
-    public int getAccountId(){
-        return accountId;
+    public int getWotbId(){
+        return wotbId;
     }
 
-    public void setAccountId(int accountId){
-        this.accountId=accountId;
+    public void setWotbId(int wotbId){
+        this.wotbId=wotbId;
     }
 
-    public int getTankId(){
-        return tankId;
+    public int getTierTank(){
+        return tierTank;
     }
 
-    public void setTankId(int tankId){
-        this.tankId=tankId;
+    public void setTierTank(int tierTank){
+        this.tierTank=tierTank;
     }
 
-    public int getBattleDifference(){
-        return battleDifference;
+    public int getBattles(){
+        return battles;
     }
 
-    public void setBattleDifference(int battleDifference){
-        this.battleDifference=battleDifference;
+    public void setBattles(int battles){
+        this.battles=battles;
     }
 
-    public int getWinDifference(){
-        return winDifference;
+    public int getWins(){
+        return wins;
     }
 
-    public void setWinDifference(int winDifference){
-        this.winDifference=winDifference;
+    public void setWins(int wins){
+        this.wins=wins;
     }
 
-    public int getLossDifference(){
-        return lossDifference;
+    public double getWinrate(){
+        return winrate;
     }
 
-    public void setLossDifference(int lossDifference){
-        this.lossDifference=lossDifference;
+    public void setWinrate(double winrate){
+        this.winrate=winrate;
     }
-    
+
     @Override
     public String toString(){
-        return "Mvc3 [accountId="+accountId+", tankId="+tankId+", battleDifference="+battleDifference+", winDifference="+winDifference+", lossDifference="+lossDifference+"]";
+        return "Mvc4 [wotbId="+wotbId+", tierTank="+tierTank+", battles="+battles+", wins="+wins+", winrate="+winrate+"]";
     }
 }

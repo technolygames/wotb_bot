@@ -5,7 +5,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import logic.UtilityClass;
-import mvc.Mvc1;
 
 /**
  *
@@ -14,33 +13,18 @@ import mvc.Mvc1;
 public class GetData{
     private GetData(){}
 
-    public static Mvc1 getUserData(String wotbId){
-        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("select discord_id,wotb_id,wotb_name,realm from user_data where wotb_id=?")){
-            ps.setString(1,wotbId);
+    public static boolean verifyCallerDiscordId(String discordId,String clantag,String realm){
+        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("select discord_id_caller from team where clantag=? and realm=?")){
+            ps.setString(1,clantag);
+            ps.setString(2,realm);
             ResultSet rs=ps.executeQuery();
-
-            Mvc1 data=new Mvc1();
+            boolean flag=false;
             while(rs.next()){
-                data.setDiscordId(rs.getString("discord_id"));
-                data.setWotbId(rs.getInt("wotb_id"));
-                data.setWotbName(rs.getString("wotb_name"));
-                data.setServer(rs.getString("realm"));
+                if(rs.getString("discord_id_caller").equals(discordId)){
+                    flag=true;
+                }
             }
-
-            rs.close();
-
-            return data;
-        }catch(SQLException e){
-            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
-            return null;
-        }
-    }
-
-    public static boolean existUser(int wotbId){
-        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("select wotb_name from user_data where wotb_id=?")){
-            ps.setInt(1,wotbId);
-            ResultSet rs=ps.executeQuery();
-            return rs.next();
+            return flag;
         }catch(SQLException e){
             UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
             return false;

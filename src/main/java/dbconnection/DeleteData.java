@@ -12,16 +12,6 @@ import logic.UtilityClass;
 public class DeleteData{
     protected DeleteData(){}
 
-    public static void deleteUserData(int accId){
-        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("delete from user_data where wotb_id=?")){
-            ps.setInt(1,accId);
-
-            ps.execute();
-        }catch(SQLException e){
-            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
-        }
-    }
-    
     public static void deletePlayerFromTeamList(String nickname,String clantag){
         try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("delete from team where wotb_name=? and clantag=?")){
             ps.setString(1,nickname);

@@ -1,54 +1,45 @@
 package mvc;
 
 public class Mvc4{
-    private int wotbId;
-    private int tierTank;
-    private int battles;
-    private int wins;
-    private double winrate;
+    private int tankId;
+    private String tankName;
+    private String nation;
+    private int tankTier;
 
-    public int getWotbId(){
-        return wotbId;
+    public int getTankId(){
+        return tankId;
     }
 
-    public void setWotbId(int wotbId){
-        this.wotbId=wotbId;
+    public void setTankId(int tankId){
+        this.tankId=tankId;
     }
 
-    public int getTierTank(){
-        return tierTank;
+    public String getTankName(){
+        return tankName;
     }
 
-    public void setTierTank(int tierTank){
-        this.tierTank=tierTank;
+    public void setTankName(String tankName){
+        this.tankName=tankName;
     }
 
-    public int getBattles(){
-        return battles;
+    public String getNation(){
+        return nation;
     }
 
-    public void setBattles(int battles){
-        this.battles=battles;
+    public void setNation(String nation){
+        this.nation=nation;
     }
 
-    public int getWins(){
-        return wins;
+    public int getTankTier(){
+        return tankTier;
     }
 
-    public void setWins(int wins){
-        this.wins=wins;
-    }
-
-    public double getWinrate(){
-        return winrate;
-    }
-
-    public void setWinrate(double winrate){
-        this.winrate=winrate;
+    public void setTankTier(int tankTier){
+        this.tankTier=tankTier;
     }
 
     @Override
     public String toString(){
-        return "Mvc4 [wotbId="+wotbId+", tierTank="+tierTank+", battles="+battles+", wins="+wins+", winrate="+winrate+"]";
+        return "Mvc5 [tankId="+tankId+", tankName="+tankName+", nation="+nation+", tankTier="+tankTier+"]";
     }
 }
