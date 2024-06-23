@@ -11,16 +11,15 @@ import io.github.cdimascio.dotenv.Dotenv;
 
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
-import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.channel.unions.MessageChannelUnion;
 import net.dv8tion.jda.api.events.guild.GuildReadyEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
-import net.dv8tion.jda.api.interactions.commands.SlashCommandInteraction;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.sharding.DefaultShardManagerBuilder;
 import net.dv8tion.jda.api.sharding.ShardManager;
@@ -37,96 +36,131 @@ public class BotLogic{
         sm.addEventListener(new EventListeners());
     }
 
+    private String mess;
+    
     private class EventListeners extends net.dv8tion.jda.api.hooks.ListenerAdapter{
         @Override
         public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent evt){
             switch(evt.getName()){
-                case "personal-stats-tier10"->{
-                    reply(evt);
-                    OptionMapping om=evt.getOption("player2");
-                    double val=BotActions.getPersonalTier10Stats(om.getAsString());
-                    if(val!=0.0){
-                        sendMessage(evt.getGuild(),evt.getChannel(),"Your tier X win rate is: "+val+"%");
-                    }else{
-                        sendMessage(evt.getGuild(),evt.getChannel(),"No data");
-                    }
+                case "personal-stats-tier10":{
+                    evt.deferReply(false).queue(m->{
+                        String player=evt.getOption("player2").getAsString();
+                        m.sendMessage(personalStats(player)).addActionRow(Button.primary("refresh-personal-stats:"+player,"Refresh")).queue();
+                    });
+                    break;
                 }
-                case "team-stats"->{
-                    reply(evt);
-                    double val=BotActions.getTeamWinrate(evt.getOption("clantag3").getAsString(),evt.getOption("realm3").getAsString());
-                    sendMessage(evt.getGuild(),evt.getChannel(),String.valueOf("Original: "+val+"%, Wargaming's page: "+Math.round(val)+"%"));
+                case "team-stats":{
+                    evt.deferReply(false).queue(m->{
+                        String clantag=evt.getOption("clantag3").getAsString();
+                        String realm=evt.getOption("realm3").getAsString();
+                        m.sendMessage(teamStats(clantag,realm)).addActionRow(Button.primary("refresh-team-stats:"+clantag+":"+realm,"Refresh")).queue();
+                    });
+                    break;
                 }
-                case "roster"->{
-                    reply(evt);
-                    String clantag=evt.getOption("clantag").getAsString();
-                    String realm=evt.getOption("realm").getAsString();
-                    double val=BotActions.getTeamWinrate(clantag,realm);
-                    sendMessage(evt.getGuild(),evt.getChannel(),"Team Roster (original: "+val+"%, Wargaming's page: "+Math.round(val)+"%): \n"+BotActions.getRoster(clantag,realm));
+                case "roster":{
+                    evt.deferReply(false).queue(m->{
+                        String realm=evt.getOption("realm").getAsString();
+                        String clantag=evt.getOption("clantag").getAsString();
+                        m.sendMessage(roster(clantag,realm)).addActionRow(Button.primary("refresh-roster:"+clantag+":"+realm,"Refresh")).queue();
+                    });
+                    break;
                 }
-                case "team-registration"->{
-                    reply(evt);
-                    OptionMapping[] arrayOm={
-                        evt.getOption("player1"),
-                        evt.getOption("player2"),
-                        evt.getOption("player3"),
-                        evt.getOption("player4"),
-                        evt.getOption("player5"),
-                        evt.getOption("player6"),
-                        evt.getOption("player7"),
-                        evt.getOption("player8"),
-                        evt.getOption("player9"),
-                        evt.getOption("player10")
-                    };
-                    OptionMapping om=evt.getOption("clantag4");
-                    OptionMapping om2=evt.getOption("realm4");
-                    sendMessage(evt.getGuild(),evt.getChannel(),om.getAsString()+"' team, of the "+om2.getAsString()+" server, has been registered!");
-                    for(OptionMapping optionMapping:arrayOm){
-                        int wotbId=JsonHandler.getAccountData(optionMapping.getAsString(),om2.getAsString()).get("account_id").getAsInt();
-                        BotActions.teamRegistration(om.getAsString(),evt.getUser().getId(),wotbId,optionMapping.getAsString(),om2.getAsString());
-                        JsonHandler.getAccTankData(wotbId);
-                    }
+                case "team-registration":{
+                    evt.deferReply(false).queue(m->{
+                        OptionMapping[] arrayOm={
+                            evt.getOption("player1"),
+                            evt.getOption("player2"),
+                            evt.getOption("player3"),
+                            evt.getOption("player4"),
+                            evt.getOption("player5"),
+                            evt.getOption("player6"),
+                            evt.getOption("player7"),
+                            evt.getOption("player8"),
+                            evt.getOption("player9"),
+                            evt.getOption("player10")
+                        };
+                        String clantag=evt.getOption("clantag4").getAsString();
+                        String realm=evt.getOption("realm4").getAsString();
+                        m.sendMessage(clantag+"' team, from "+realm+" server, has been registered!").queue();
+                        for(OptionMapping optionMapping:arrayOm){
+                            int wotbId=JsonHandler.getAccountData(optionMapping.getAsString(),realm).get("account_id").getAsInt();
+                            BotActions.teamRegistration(clantag,evt.getUser().getId(),wotbId,optionMapping.getAsString(),realm);
+                            JsonHandler.getAccTankData(wotbId);
+                        }
+                    });
+                    break;
                 }
-                case "single-teammate-registration"->{
-                    reply(evt);
-                    OptionMapping om=evt.getOption("player5");
-                    OptionMapping om2=evt.getOption("clantag5");
-                    OptionMapping om3=evt.getOption("server5");
-                    if(GetData.verifyCallerDiscordId(evt.getUser().getId(),om2.getAsString(),om3.getAsString())){
-                        int wotbId=JsonHandler.getAccountData(om.getAsString(),om3.getAsString()).get("account_id").getAsInt();
-                        BotActions.teamRegistration(om2.getAsString(),evt.getUser().getId(),wotbId,om.getAsString(),om3.getAsString());
-                        JsonHandler.getAccTankData(wotbId);
-                        sendMessage(evt.getGuild(),evt.getChannel(),om.getAsString()+" of the "+om2.getAsString()+" team, from "+om3.getAsString()+" server, has been registered!");
-                    }else{
-                        sendMessage(evt.getGuild(),evt.getChannel(),"You are not team leader, you can't register a new teammate without autorization of team caller/leader");
-                    }
+                case "single-teammate-registration":{
+                    evt.deferReply(false).queue(m->{
+                        String player=evt.getOption("player5").getAsString();
+                        String clantag=evt.getOption("clantag5").getAsString();
+                        String realm=evt.getOption("server5").getAsString();
+                        if(GetData.verifyCallerDiscordId(evt.getUser().getId(),clantag,realm)){
+                            int wotbId=JsonHandler.getAccountData(player,realm).get("account_id").getAsInt();
+                            BotActions.teamRegistration(clantag,evt.getUser().getId(),wotbId,player,realm);
+                            JsonHandler.getAccTankData(wotbId);
+                            mess=player+" of the "+clantag+" team, from "+realm+" server, has been registered!";
+                        }else{
+                            mess="You are not team leader, you can't register a new teammate without autorization of team caller/leader";
+                        }
+                        m.sendMessage(mess).queue();
+                    });
+                    break;
                 }
-                case "delete-team-registry"->{
-                    reply(evt);
-                    String clantag=evt.getOption("clantag6").getAsString();
-                    String realm=evt.getOption("server6").getAsString();
-                    if(GetData.verifyCallerDiscordId(evt.getUser().getId(),clantag,realm)){
-                        DeleteData.deleteTeam(clantag,realm);
-                        sendMessage(evt.getGuild(),evt.getChannel(),clantag+" team, from "+realm+" server, has been deleted!");
-                    }else{
-                        sendMessage(evt.getGuild(),evt.getChannel(),"You are not team leader, you can't delete team's registry without autorization of team caller/leader");
-                    }
+                case "delete-team-registry":{
+                    evt.deferReply(false).queue(m->{
+                        String clantag=evt.getOption("clantag6").getAsString();
+                        String realm=evt.getOption("server6").getAsString();
+                        if(GetData.verifyCallerDiscordId(evt.getUser().getId(),clantag,realm)){
+                            DeleteData.deleteTeam(clantag,realm);
+                            mess=clantag+" team, from "+realm+" server, has been deleted!";
+                        }else{
+                            mess="You are not team leader, you can't delete team's registry without autorization of team caller/leader";
+                        }
+                        m.sendMessage(mess).queue();
+                    });
+                    break;
                 }
-                case "delete-teammate-registry"->{
-                    reply(evt);
-                    OptionMapping om=evt.getOption("player7");
-                    String clantag=evt.getOption("clantag7").getAsString();
-                    String realm=evt.getOption("server7").getAsString();
-                    if(GetData.verifyCallerDiscordId(evt.getUser().getId(),clantag,realm)){
-                        DeleteData.deletePlayerFromTeamList(om.getAsString(),clantag);
-                        sendMessage(evt.getGuild(),evt.getChannel(),om.getAsString()+" has been deleted successfully!");
-                    }else{
-                        sendMessage(evt.getGuild(),evt.getChannel(),"You are not team leader, you can't delete a teammate registry without autorization of team caller/leader");
-                    }
+                case "delete-teammate-registry":{
+                    evt.deferReply(false).queue(m->{
+                        String player=evt.getOption("player7").getAsString();
+                        String clantag=evt.getOption("clantag7").getAsString();
+                        String realm=evt.getOption("server7").getAsString();
+                        if(GetData.verifyCallerDiscordId(evt.getUser().getId(),clantag,realm)){
+                            DeleteData.deletePlayerFromTeamList(player,clantag);
+                            mess=player+" has been deleted successfully!";
+                        }else{
+                            mess="You are not team leader, you can't delete a teammate registry without autorization of team caller/leader";
+                        }
+                        m.sendMessage(mess).queue();
+                    });
+                    break;
                 }
-                default->{break;}
+                default:break;
             }
         }
 
+        @Override
+        public void onButtonInteraction(@NotNull ButtonInteractionEvent evt){
+            String id=evt.getButton().getId();
+            String[] val=id.split(":");
+            switch(val[0]){
+                case "refresh-roster":{
+                    evt.deferEdit().queue(s->s.editOriginal(roster(val[1],val[2])).queue());
+                    break;
+                }
+                case "refresh-team-stats":{
+                    evt.deferEdit().queue(s->s.editOriginal(teamStats(val[1],val[2])).queue());
+                    break;
+                }
+                case "refresh-personal-stats":{
+                    evt.deferEdit().queue(s->s.editOriginal(personalStats(val[1])).queue());
+                    break;
+                }
+                default:break;
+            }
+        }
+        
         @Override
         public void onGuildReady(@NotNull GuildReadyEvent evt){
             List<CommandData> cd=new ArrayList<>();
@@ -177,13 +211,24 @@ public class BotLogic{
 
             evt.getGuild().updateCommands().addCommands(cd).complete();
         }
-
-        private void sendMessage(Guild evt,MessageChannelUnion channel,String message){
-            evt.getTextChannelById(channel.getIdLong()).sendMessage(message).queue();
+        
+        protected String personalStats(String player){
+            double val=BotActions.getPersonalTier10Stats(player);
+            if(val!=0.0){
+                return "Your tier X win rate is: "+val+"%";
+            }else{
+                return "No data or is under 1000 battles";
+            }
         }
-
-        private void reply(SlashCommandInteraction evt){
-            evt.reply("Processing...").setEphemeral(true).queue();
+        
+        protected String teamStats(String clantag,String realm){
+            double val=BotActions.getTeamWinrate(clantag,realm);
+            return "Original: "+val+"%, Wargaming's page: "+Math.round(val)+"%";
+        }
+        
+        protected String roster(String clantag,String realm){
+            double val=BotActions.getTeamWinrate(clantag,realm);
+            return "Team Roster (original: "+val+"%, Wargaming's page: "+Math.round(val)+"%): \n"+BotActions.getRoster(clantag,realm);
         }
     }
 }

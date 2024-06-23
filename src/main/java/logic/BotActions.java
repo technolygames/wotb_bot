@@ -4,10 +4,10 @@ import dbconnection.DbConnection;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Collections;
 import java.sql.PreparedStatement;
 
 /**
@@ -27,7 +27,7 @@ public class BotActions{
     public static double getTeamWinrate(String clantag,String server){
         try(var cn=DbConnection.getConnection();
         PreparedStatement ps=cn.prepareStatement("select wotb_id from team where clantag=? and realm=?");
-        PreparedStatement ps2=cn.prepareStatement("select wotb_id, tank_tier, sum(battles) as battles, sum(wins) as wins from tank_stats where wotb_id=?")){
+        PreparedStatement ps2=cn.prepareStatement("select wotb_id, sum(battles) as battles, sum(wins) as wins from tank_stats where wotb_id=? group by wotb_id")){
             ps.setString(1,clantag);
             ps.setString(2,server);
 
@@ -38,7 +38,6 @@ public class BotActions{
             while(rs.next()){
                 int id=rs.getInt("wotb_id");
                 JsonHandler.dataManipulation(id);
-                JsonHandler.updatePlayerNickname(id);
                 ps2.setInt(1,id);
                 ResultSet rs2=ps2.executeQuery();
                 while(rs2.next()){
@@ -51,12 +50,12 @@ public class BotActions{
             }
 
             Collections.sort(winrates,Collections.reverseOrder());
-
-            for(int i=0;i<Math.min(7,winrates.size());i++){
+            int count=Math.min(7,winrates.size());
+            for(int i=0;i<count;i++){
                 value+=winrates.get(i);
             }
 
-            return UtilityClass.getFormattedDouble(value/7);
+            return count==0?0.0:UtilityClass.getFormattedDouble(value/count);
         }catch(SQLException e){
             UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
             return 0.0;
@@ -65,6 +64,7 @@ public class BotActions{
 
     /**
      * @param clantag
+     * @param discordId
      * @param wotbId
      * @param nickname
      * @param realm
@@ -85,41 +85,13 @@ public class BotActions{
     }
 
     /**
-     * @param nickname
-     * @return
-     */
-    public static double getPersonalTier10Stats(String nickname){
-        try (var cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("select wotb_id from team where wotb_name=?");
-        PreparedStatement ps2=cn.prepareStatement("select sum(wins) as wins, sum(battles) as battles from tank_stats where wotb_id=?")) {
-            ps.setString(1,nickname);
-            ResultSet rs=ps.executeQuery();
-            double wins=0.0;
-            while(rs.next()){
-                int id=rs.getInt("wotb_id");
-                JsonHandler.getAccTankData(id);
-                JsonHandler.updatePlayerNickname(id);
-                ps2.setInt(1,id);
-                ResultSet rs2=ps2.executeQuery();
-                if(rs2.next()){
-                    wins=UtilityClass.getOverallWinrate(rs2.getInt("wins"),rs2.getInt("battles"));
-                }
-            }
-            return wins;
-        }catch(SQLException e){
-            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
-            return 0.0;
-        }
-    }
-
-    /**
      * 
      * @param clantag
      * @param realm
      * @return
     */
     public static String getRoster(String clantag,String realm){
-        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("select wotb_id,wotb_name from team where clantag=? and realm=?")){
+        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("select wotb_name from team where clantag=? and realm=?")){
             ps.setString(1,clantag);
             ps.setString(2,realm);
             ResultSet rs=ps.executeQuery();
@@ -130,14 +102,12 @@ public class BotActions{
 
             while(rs.next()){
                 String val=rs.getString("wotb_name");
-                JsonHandler.updatePlayerNickname(rs.getInt("wotb_id"));
-
-                players.add(new Player(val,getPersonalTier10Stats(val)));
+                players.add(new Player(val,BotActions.getPersonalTier10Stats(val)));
             }
 
             Collections.sort(players,Comparator.comparingDouble(player->-player.winrate));
 
-            for (int i=0;i<players.size();i++){
+            for(int i=0;i<players.size();i++){
                 Player player=players.get(i);
                 value.append(count).append(". ").append(player).append("\n");
                 count++;
@@ -152,8 +122,38 @@ public class BotActions{
             return "No data";
         }
     }
+    
+    /**
+     * @param nickname
+     * @return
+     */
+    public static double getPersonalTier10Stats(String nickname){
+        try (var cn=DbConnection.getConnection();
+        PreparedStatement ps=cn.prepareStatement("select wotb_id from team where wotb_name=?");
+        PreparedStatement ps2=cn.prepareStatement("select sum(wins) as wins, sum(battles) as battles from tank_stats where wotb_id=?")) {
+            ps.setString(1,nickname);
+            ResultSet rs=ps.executeQuery();
+            double wins=0.0;
+            while(rs.next()){
+                int id=rs.getInt("wotb_id");
+                JsonHandler.getAccTankData(id);
+                ps2.setInt(1,id);
+                ResultSet rs2=ps2.executeQuery();
+                if(rs2.next()){
+                    int val=rs2.getInt("battles");
+                    if(val>1000){
+                        wins=UtilityClass.getOverallWinrate(rs2.getInt("wins"),val);
+                    }
+                }
+            }
+            return wins;
+        }catch(SQLException e){
+            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
+            return 0.0;
+        }
+    }
 
-    public static class Player{
+    private static class Player{
         String name;
         double winrate;
 
@@ -163,8 +163,8 @@ public class BotActions{
         }
 
         @Override
-        public String toString() {
-            return name+" ("+String.format("%.2f", winrate)+"%)";
+        public String toString(){
+            return name+" ("+String.format("%.2f",winrate)+"%)";
         }
     }
 }

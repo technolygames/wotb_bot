@@ -2,24 +2,26 @@ package logic;
 
 import dbconnection.DbConnection;
 import dbconnection.UpdateData;
-import threads.Thread2;
 
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.ProtocolException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
-import java.net.ProtocolException;
-import java.net.URL;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.PreparedStatement;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonElement;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  *
@@ -36,11 +38,12 @@ public class JsonHandler{
      * Data returned from Wg's api is in-game name and user ID.<br>
      * Method used to get this values is getNickname().
      * @param nickname
+     * @param realm
      * @return in-game name and user ID used to get info from the api.
     */
     public static JsonObject getAccountData(String nickname,String realm){
         try{
-            je=JsonParser.parseString(new Thread2().thread(ApiRequest.getData("https://"+UtilityClass.getRealm(realm)+"/wotb/account/list/?application_id="+UtilityClass.APP_ID+"&search="+nickname)));
+            je=JsonParser.parseString(getData(UtilityClass.getRealm(realm)+"/wotb/account/list/?application_id="+UtilityClass.APP_ID+"&search="+nickname));
             gson=new GsonBuilder().create();
 
             return gson.toJsonTree(je).
@@ -66,12 +69,13 @@ public class JsonHandler{
         PreparedStatement ps5=cn.prepareStatement("delete from tank_stats where tank_tier<=0");
         PreparedStatement ps6=cn.prepareStatement("select realm from team where wotb_id=?")){
             ps6.setInt(1,accId);
+            updatePlayerNickname(accId);
             ResultSet rs=ps6.executeQuery();
             String realm="";
             while(rs.next()){
                 realm=UtilityClass.getRealm(rs.getString("realm"));
             }
-            je=JsonParser.parseString(new Thread2().thread(ApiRequest.getData("https://"+realm+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=all%2Ctank_id%2Clast_battle_time")));
+            je=JsonParser.parseString(getData(realm+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=all%2Ctank_id%2Clast_battle_time"));
             gson=new GsonBuilder().create();
 
             var text=gson.toJsonTree(je).getAsJsonObject().getAsJsonObject("data");
@@ -123,6 +127,7 @@ public class JsonHandler{
         PreparedStatement ps2=cn.prepareStatement("update tank_stats set battles=battles+?, wins=wins+?, losses=losses+? where wotb_id=? and tank_id=?");
         PreparedStatement ps3=cn.prepareStatement("select realm from team where wotb_id=?")){
             ps3.setInt(1,accId);
+            updatePlayerNickname(accId);
             ResultSet rs=ps3.executeQuery();
             String realm="";
             while(rs.next()){
@@ -132,7 +137,7 @@ public class JsonHandler{
             ps.setInt(1,accId);
             ResultSet rs2=ps.executeQuery();
 
-            je=JsonParser.parseString(new Thread2().thread(ApiRequest.getData("https://"+realm+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=all%2Ctank_id%2Clast_battle_time")));
+            je=JsonParser.parseString(getData(realm+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=all%2Ctank_id%2Clast_battle_time"));
             gson=new GsonBuilder().create();
             getAccTankData(accId);
 
@@ -145,8 +150,6 @@ public class JsonHandler{
                     JsonObject val3=val2.getAsJsonObject();
                     JsonObject val4=val3.getAsJsonObject("all");
 
-                    String lit1="tank_id";
-
                     int v1=rs2.getInt("battles");
                     int v2=rs2.getInt("wins");
                     int v3=rs2.getInt("losses");
@@ -154,9 +157,9 @@ public class JsonHandler{
                     int value1=val4.get("battles").getAsInt();
                     int value2=val4.get("wins").getAsInt();
                     int value3=val4.get("losses").getAsInt();
-                    int value4=val3.get(lit1).getAsInt();
+                    int value4=val3.get("tank_id").getAsInt();
 
-                    if(rs2.getInt(lit1)==value4&&v1!=value1){
+                    if(rs2.getInt("tank_id")==value4&&v1!=value1){
                         if(value2>=v2&&value3>=v3){
                             ps2.setInt(1,UtilityClass.calculateDifference(value1,v1));
                             ps2.setInt(2,UtilityClass.calculateDifference(value2,v2));
@@ -181,14 +184,14 @@ public class JsonHandler{
     /**
      * @param wotbId
     */
-    public static void updatePlayerNickname(int wotbId){
+    protected static void updatePlayerNickname(int wotbId){
         try(var cn=DbConnection.getConnection();
         PreparedStatement ps=cn.prepareStatement("select wotb_name,realm from team where wotb_id=?")){
             ps.setInt(1,wotbId);
             ResultSet rs=ps.executeQuery();
             
             if(rs.next()){
-                je=JsonParser.parseString(new Thread2().thread(ApiRequest.getData("https://"+UtilityClass.getRealm(rs.getString("realm"))+"/wotb/account/info/?application_id="+UtilityClass.APP_ID+"&fields=nickname&account_id="+wotbId)));
+                je=JsonParser.parseString(getData(UtilityClass.getRealm(rs.getString("realm"))+"/wotb/account/info/?application_id="+UtilityClass.APP_ID+"&fields=nickname&account_id="+wotbId));
                 gson=new GsonBuilder().create();
 
                 var data1=gson.toJsonTree(je).
@@ -212,11 +215,14 @@ public class JsonHandler{
         }
     }
 
+    /**
+     * 
+     */
     public static void getTankInfo(){
         try(var cn=DbConnection.getConnection();
         PreparedStatement ps=cn.prepareStatement("insert into tank_list values(?,?,?,?)");
         PreparedStatement ps2=cn.prepareStatement("select tank_name from tank_list where tank_id=?")){
-            je=JsonParser.parseString(new Thread2().thread(ApiRequest.getData("https://api.wotblitz.com/wotb/encyclopedia/vehicles/?application_id="+UtilityClass.APP_ID+"&fields=tank_id%2Ctier%2Cnation%2Cname")));
+            je=JsonParser.parseString(getData("https://api.wotblitz.com/wotb/encyclopedia/vehicles/?application_id="+UtilityClass.APP_ID+"&fields=tank_id%2Ctier%2Cnation%2Cname"));
             gson=new GsonBuilder().create();
 
             var data1=gson.toJsonTree(je).
@@ -249,35 +255,37 @@ public class JsonHandler{
         }
     }
 
-    protected class ApiRequest{
-        private ApiRequest(){}
-
-        /**
-         * Makes requests to the WG's public API
-         * @param link
-         * @return data from WG's API
-         */
-        public static InputStream getData(String link){
-            try{
-                URL u=new URL(link);
-                HttpURLConnection u2=(HttpURLConnection)u.openConnection();
-                u2.setRequestMethod("GET");
-                u2.setRequestProperty("Accept","application/json");
-                if(u2.getResponseCode()==HttpURLConnection.HTTP_OK){
-                    return u2.getInputStream();
-                }else{
-                    return null;
+    /**
+     * Makes requests to the WG's public API
+     * @param link
+     * @return data from WG's API
+     */
+    protected static String getData(String link){
+        try{
+            URL u=new URL(link);
+            HttpURLConnection u2=(HttpURLConnection)u.openConnection();
+            u2.setRequestMethod("GET");
+            u2.setRequestProperty("Accept","application/json");
+            if(u2.getResponseCode()==HttpURLConnection.HTTP_OK){
+                try(BufferedReader br=new BufferedReader(new InputStreamReader(u2.getInputStream(),StandardCharsets.UTF_8))){
+                    String line="";
+                    for(String line2;(line2=br.readLine())!=null;){
+                        line=line2;
+                    }
+                    return line;
                 }
-            }catch(ProtocolException e){
-                UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
-                return null;
-            }catch(MalformedURLException x){
-                UtilityClass.LOGGER.severe(x.fillInStackTrace().toString());
-                return null;
-            }catch(IOException s){
-                UtilityClass.LOGGER.severe(s.fillInStackTrace().toString());
+            }else{
                 return null;
             }
+        }catch(ProtocolException e){
+            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
+            return null;
+        }catch(MalformedURLException x){
+            UtilityClass.LOGGER.severe(x.fillInStackTrace().toString());
+            return null;
+        }catch(IOException s){
+            UtilityClass.LOGGER.severe(s.fillInStackTrace().toString());
+            return null;
         }
     }
 }

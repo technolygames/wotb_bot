@@ -23,15 +23,15 @@ public class DbConnection{
     static{
         Properties p=new Properties();
         HikariConfig config=new HikariConfig();
-        try{
-            p.load(new FileInputStream("data/config.properties"));
+        try(FileInputStream fis=new FileInputStream("data/config.properties")){
+            p.load(fis);
             config.setJdbcUrl("jdbc:mysql://"+p.getProperty("server")+":"+p.getProperty("port")+"/"+p.getProperty("database")+"?serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8");
             config.setUsername(p.getProperty("user"));
             config.setPassword(p.getProperty("pass"));
             config.addDataSourceProperty("cachePrepStmts","true");
             config.addDataSourceProperty("prepStmtCacheSize","256");
             config.addDataSourceProperty("prepStmtCacheSqlLimit","2048");
-            config.setMaximumPoolSize(600);
+            config.setMaximumPoolSize(900);
             ds=new HikariDataSource(config);
         }catch(IOException x){
             UtilityClass.LOGGER.severe(x.fillInStackTrace().toString());
