@@ -1,24 +1,31 @@
 package logic;
 
+import io.github.cdimascio.dotenv.Dotenv;
+
+import java.time.ZoneId;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.io.IOException;
 import java.io.FileInputStream;
 import java.text.DecimalFormat;
 import java.util.Set;
 import java.util.Properties;
 
+import java.time.format.DateTimeFormatter;
+import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import io.github.cdimascio.dotenv.Dotenv;
 
 /**
  *
  * @author erick
  */
 public class UtilityClass{
-    private UtilityClass(){}
+    Logger logger;
+    public UtilityClass(){
+        logger=Logger.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    }
 
-    public static final Logger LOGGER=Logger.getLogger(Logger.GLOBAL_LOGGER_NAME);
-    public static final String APP_ID=UtilityClass.getAppID();
+    public static final String APP_ID=new UtilityClass().getAppID();
     
     /**
      * 
@@ -31,6 +38,14 @@ public class UtilityClass{
             val1=val2;
         }
         return val1;
+    }
+    
+    /**
+     * @param epochTime
+     * @return
+     */
+    public static String getMatchDate(long epochTime){
+        return LocalDateTime.ofInstant(Instant.ofEpochSecond(epochTime),ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
     }
 
     /**
@@ -65,7 +80,7 @@ public class UtilityClass{
         return getFormattedDouble((wins2/battles2)*100);
     }
 
-    private static String getAppID(){
+    protected String getAppID(){
         return Dotenv.configure().directory("data").load().get("APP_ID");
     }
 
@@ -75,8 +90,12 @@ public class UtilityClass{
             p.load(fis);
             return "https://"+p.getProperty(realm);
         }catch(IOException e){
-            LOGGER.severe(e.fillInStackTrace().toString());
+            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
             return "NA";
         }
+    }
+    
+    public void log(Level level,String message,Throwable thrown){
+        logger.log(level,message,thrown);
     }
 }

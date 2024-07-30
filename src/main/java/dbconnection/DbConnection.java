@@ -2,14 +2,16 @@ package dbconnection;
 
 import logic.UtilityClass;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
 import java.io.IOException;
 import java.io.FileInputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
+import java.util.logging.Level;
 
 /**
  *
@@ -17,9 +19,8 @@ import com.zaxxer.hikari.HikariDataSource;
  */
 public class DbConnection{
     private DbConnection(){}
-
-    private static HikariDataSource ds;
-
+    
+    protected static HikariDataSource ds;
     static{
         Properties p=new Properties();
         HikariConfig config=new HikariConfig();
@@ -31,10 +32,11 @@ public class DbConnection{
             config.addDataSourceProperty("cachePrepStmts","true");
             config.addDataSourceProperty("prepStmtCacheSize","256");
             config.addDataSourceProperty("prepStmtCacheSqlLimit","2048");
-            config.setMaximumPoolSize(900);
+            config.setMaximumPoolSize(50);
+            config.setMinimumIdle(10);
             ds=new HikariDataSource(config);
-        }catch(IOException x){
-            UtilityClass.LOGGER.severe(x.fillInStackTrace().toString());
+        }catch(IOException e){
+            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
         }
     }
 
@@ -42,13 +44,10 @@ public class DbConnection{
         try{
             return ds.getConnection();
         }catch(SQLException e){
-            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
+            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
             return null;
-        }catch(NullPointerException s){
-            UtilityClass.LOGGER.severe(s.fillInStackTrace().toString());
-            return null;
-        }catch(Exception n){
-            UtilityClass.LOGGER.severe(n.fillInStackTrace().toString());
+        }catch(NullPointerException x){
+            new UtilityClass().log(Level.SEVERE,x.getMessage(),x);
             return null;
         }
     }

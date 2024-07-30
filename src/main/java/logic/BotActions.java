@@ -3,19 +3,42 @@ package logic;
 import dbconnection.DbConnection;
 
 import java.sql.ResultSet;
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
-import java.sql.PreparedStatement;
+
+import java.util.logging.Level;
 
 /**
  * 
  * @author erick
  */
 public class BotActions{
-    protected BotActions(){}
+    /**
+     * @param clantag
+     * @param discordId
+     * @param wotbId
+     * @param nickname
+     * @param realm
+     */
+    public void teamRegistration(String clantag,String discordId,int wotbId,String nickname,String realm){
+        try(Connection cn=DbConnection.getConnection();
+                PreparedStatement ps=cn.prepareStatement("insert into team values(?,?,?,?,?)")){
+            ps.setString(1,clantag);
+            ps.setString(2,discordId);
+            ps.setInt(3,wotbId);
+            ps.setString(4,nickname);
+            ps.setString(5,realm);
+            ps.addBatch();
+            ps.executeBatch();
+        }catch(SQLException e){
+            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
+        }
+    }
 
     /**
      * Gets team tournament win rate.<br>
@@ -24,28 +47,17 @@ public class BotActions{
      * @param server server where are from the team.
      * @return tournament win rate.
      */
-    public static double getTeamWinrate(String clantag,String server){
-        try(var cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("select wotb_id from team where clantag=? and realm=?");
-        PreparedStatement ps2=cn.prepareStatement("select wotb_id, sum(battles) as battles, sum(wins) as wins from tank_stats where wotb_id=? group by wotb_id")){
-            ps.setString(1,clantag);
-            ps.setString(2,server);
-
+    public double getTeamWinrate(String clantag,String server){
+        try(Connection cn=DbConnection.getConnection();
+                PreparedStatement ps=cn.prepareStatement("select wotb_name from team where clantag=? and realm=?")){
             double value=0.0;
             List<Double> winrates=new ArrayList<>();
 
-            ResultSet rs=ps.executeQuery();
-            while(rs.next()){
-                int id=rs.getInt("wotb_id");
-                JsonHandler.dataManipulation(id);
-                ps2.setInt(1,id);
-                ResultSet rs2=ps2.executeQuery();
-                while(rs2.next()){
-                    int battles=rs2.getInt("battles");
-                    if(battles>1000){
-                        double winrate=UtilityClass.getOverallWinrate(rs2.getInt("wins"),battles);
-                        winrates.add(winrate);
-                    }
+            ps.setString(1,clantag);
+            ps.setString(2,server);
+            try(ResultSet rs=ps.executeQuery()){
+                while(rs.next()){
+                    winrates.add(getTier10Stats(rs.getString("wotb_name"),server));
                 }
             }
 
@@ -57,30 +69,8 @@ public class BotActions{
 
             return count==0?0.0:UtilityClass.getFormattedDouble(value/count);
         }catch(SQLException e){
-            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
+            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
             return 0.0;
-        }
-    }
-
-    /**
-     * @param clantag
-     * @param discordId
-     * @param wotbId
-     * @param nickname
-     * @param realm
-     */
-    public static void teamRegistration(String clantag,String discordId,int wotbId,String nickname,String realm){
-        try(var cn=DbConnection.getConnection();
-            PreparedStatement ps=cn.prepareStatement("insert into team values(?,?,?,?,?)")){
-            ps.setString(1,clantag);
-            ps.setString(2,discordId);
-            ps.setInt(3,wotbId);
-            ps.setString(4,nickname);
-            ps.setString(5,realm);
-            ps.addBatch();
-            ps.executeBatch();
-        }catch(SQLException e){
-            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
         }
     }
 
@@ -90,19 +80,20 @@ public class BotActions{
      * @param realm
      * @return
     */
-    public static String getRoster(String clantag,String realm){
-        try(PreparedStatement ps=DbConnection.getConnection().prepareStatement("select wotb_name from team where clantag=? and realm=?")){
-            ps.setString(1,clantag);
-            ps.setString(2,realm);
-            ResultSet rs=ps.executeQuery();
-
+    public String getRoster(String clantag,String realm){
+        try(Connection cn=DbConnection.getConnection();
+                PreparedStatement ps=cn.prepareStatement("select wotb_name from team where clantag=? and realm=?")){
             StringBuilder value=new StringBuilder();
             List<Player> players=new ArrayList<>();
             int count=1;
-
-            while(rs.next()){
-                String val=rs.getString("wotb_name");
-                players.add(new Player(val,BotActions.getPersonalTier10Stats(val)));
+            
+            ps.setString(1,clantag);
+            ps.setString(2,realm);
+            try(ResultSet rs=ps.executeQuery()){
+                while(rs.next()){
+                    String val=rs.getString("wotb_name");
+                    players.add(new Player(val,getTier10Stats(val,realm)));
+                }
             }
 
             Collections.sort(players,Comparator.comparingDouble(player->-player.winrate));
@@ -118,38 +109,86 @@ public class BotActions{
 
             return value.toString();
         }catch(SQLException e){
-            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
+            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
             return "No data";
         }
     }
     
     /**
      * @param nickname
+     * @param realm
      * @return
      */
-    public static double getPersonalTier10Stats(String nickname){
-        try (var cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("select wotb_id from team where wotb_name=?");
-        PreparedStatement ps2=cn.prepareStatement("select sum(wins) as wins, sum(battles) as battles from tank_stats where wotb_id=?")) {
-            ps.setString(1,nickname);
-            ResultSet rs=ps.executeQuery();
+    public double getTier10Stats(String nickname,String realm){
+        try(Connection cn=DbConnection.getConnection();
+                PreparedStatement ps=cn.prepareStatement("SELECT t.wotb_id, SUM(ts.wins) AS wins, SUM(ts.battles) AS battles FROM tank_stats ts JOIN team t ON ts.wotb_id = t.wotb_id WHERE t.wotb_name = ? AND t.realm = ? GROUP BY t.wotb_id;")){
             double wins=0.0;
-            while(rs.next()){
-                int id=rs.getInt("wotb_id");
-                JsonHandler.getAccTankData(id);
-                ps2.setInt(1,id);
-                ResultSet rs2=ps2.executeQuery();
-                if(rs2.next()){
-                    int val=rs2.getInt("battles");
-                    if(val>1000){
-                        wins=UtilityClass.getOverallWinrate(rs2.getInt("wins"),val);
+
+            ps.setString(1,nickname);
+            ps.setString(2,realm);
+            try(ResultSet rs=ps.executeQuery()){
+                if(rs.next()){
+                    new JsonHandler().dataManipulation(rs.getInt("wotb_id"));
+                    int val=rs.getInt("battles");
+                    if(val>=1000){
+                        wins=UtilityClass.getOverallWinrate(rs.getInt("wins"),val);
+                    }else{
+                        wins=0.0;
                     }
                 }
             }
             return wins;
         }catch(SQLException e){
-            UtilityClass.LOGGER.severe(e.fillInStackTrace().toString());
+            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
             return 0.0;
+        }
+    }
+    
+    /**
+     * @param nickname
+     * @param realm
+     * @return
+     */
+    public double getPersonalTier10Stats(String nickname,String realm){
+        try(Connection cn=DbConnection.getConnection();
+                PreparedStatement ps=cn.prepareStatement("SELECT t.wotb_id, SUM(ts.wins) AS wins, SUM(ts.battles) AS battles FROM tank_stats ts JOIN team t ON ts.wotb_id = t.wotb_id WHERE t.wotb_name = ? AND t.realm = ? GROUP BY t.wotb_id;")){
+            double wins=0.0;
+
+            ps.setString(1,nickname);
+            ps.setString(2,realm);
+            try(ResultSet rs=ps.executeQuery()){
+                new JsonHandler().dataManipulation(rs.getInt("wotb_id"));
+                if(rs.next()){
+                    wins=UtilityClass.getOverallWinrate(rs.getInt("wins"),rs.getInt("battles"));
+                }
+            }
+            return wins;
+        }catch(SQLException e){
+            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
+            return 0.0;
+        }
+    }
+
+    public String checkPlayer(String nickname,String realm){
+        try(Connection cn=DbConnection.getConnection();
+                PreparedStatement ps=cn.prepareStatement("select clantag from team where wotb_name=? and realm=?")){
+            String val="";
+            ps.setString(1,nickname);
+            ps.setString(2,realm);
+            try(ResultSet rs=ps.executeQuery()){
+                if(rs.next()){
+                    double stats=getTier10Stats(nickname,realm);
+                    if(stats!=0.0){
+                        val="("+realm+") - ["+rs.getString("clantag")+"] "+nickname+" ("+stats+"%)";
+                    }
+                }else{
+                    val="No data";
+                }
+            }
+            return val;
+        }catch(SQLException e){
+            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
+            return null;
         }
     }
 
