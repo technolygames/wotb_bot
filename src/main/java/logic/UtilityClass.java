@@ -2,16 +2,12 @@ package logic;
 
 import io.github.cdimascio.dotenv.Dotenv;
 
-import java.time.ZoneId;
-import java.time.Instant;
-import java.time.LocalDateTime;
 import java.io.IOException;
 import java.io.FileInputStream;
 import java.text.DecimalFormat;
 import java.util.Set;
 import java.util.Properties;
 
-import java.time.format.DateTimeFormatter;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -26,6 +22,7 @@ public class UtilityClass{
     }
 
     public static final String APP_ID=new UtilityClass().getAppID();
+    public static final int MAX_BATTLE_COUNT=2000;
     
     /**
      * 
@@ -39,17 +36,8 @@ public class UtilityClass{
         }
         return val1;
     }
-    
-    /**
-     * @param epochTime
-     * @return
-     */
-    public static String getMatchDate(long epochTime){
-        return LocalDateTime.ofInstant(Instant.ofEpochSecond(epochTime),ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-    }
 
     /**
-     * 
      * @param value
      * @return
      */
@@ -58,7 +46,6 @@ public class UtilityClass{
     }
 
     /**
-     * 
      * @param fromApi
      * @param fromDatabase
      * @return
@@ -79,11 +66,38 @@ public class UtilityClass{
 
         return getFormattedDouble((wins2/battles2)*100);
     }
+    
+    public static double roundValue(double val){
+        if(val-Math.floor(val)>=0.50){
+            return Math.ceil(val);
+        }else{
+            return Math.floor(val);
+        }
+    }
 
+    /**
+     * @param value
+     * @return
+     */
+    public static boolean getBoolean(int value){
+        switch(value){
+            case 0:return false;
+            case 1:return true;
+            default:return false;
+        }
+    }
+
+    /**
+     * @return
+     */
     protected String getAppID(){
         return Dotenv.configure().directory("data").load().get("APP_ID");
     }
 
+    /**
+     * @param realm
+     * @return
+     */
     public static String getRealm(String realm){
         Properties p=new Properties();
         try(FileInputStream fis=new FileInputStream("data/realms.properties")){
@@ -94,7 +108,20 @@ public class UtilityClass{
             return "NA";
         }
     }
+
+    /**
+     * @param level
+     * @param message
+     */
+    public void log(Level level,String message){
+        logger.log(level,message);
+    }
     
+    /**
+     * @param level
+     * @param message
+     * @param thrown
+     */
     public void log(Level level,String message,Throwable thrown){
         logger.log(level,message,thrown);
     }
