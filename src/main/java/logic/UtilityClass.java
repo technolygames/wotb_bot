@@ -3,7 +3,7 @@ package logic;
 import io.github.cdimascio.dotenv.Dotenv;
 
 import java.io.IOException;
-import java.io.FileInputStream;
+import java.io.InputStream;
 import java.text.DecimalFormat;
 import java.util.Set;
 import java.util.Properties;
@@ -66,26 +66,6 @@ public class UtilityClass{
 
         return getFormattedDouble((wins2/battles2)*100);
     }
-    
-    public static double roundValue(double val){
-        if(val-Math.floor(val)>=0.50){
-            return Math.ceil(val);
-        }else{
-            return Math.floor(val);
-        }
-    }
-
-    /**
-     * @param value
-     * @return
-     */
-    public static boolean getBoolean(int value){
-        switch(value){
-            case 0:return false;
-            case 1:return true;
-            default:return false;
-        }
-    }
 
     /**
      * @return
@@ -100,7 +80,7 @@ public class UtilityClass{
      */
     public static String getRealm(String realm){
         Properties p=new Properties();
-        try(FileInputStream fis=new FileInputStream("data/realms.properties")){
+        try(InputStream fis=ClassLoader.getSystemClassLoader().getResourceAsStream("realms.properties")){
             p.load(fis);
             return "https://"+p.getProperty(realm);
         }catch(IOException e){

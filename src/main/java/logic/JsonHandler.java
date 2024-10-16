@@ -265,7 +265,6 @@ public class JsonHandler{
                             int battlesDb=rs2.getInt("battles");
                             int winsDb=rs2.getInt("wins");
                             int tankIdDb=rs2.getInt("tank_id");
-    
                             if(tankIdDb==tankId&&(battles!=battlesDb||wins!=winsDb)){
                                 new UtilityClass().log(Level.INFO,"si hay cambios de "+accId+", del tanque "+tankId);
                                 ps2.setInt(1,UtilityClass.calculateDifference(battles,battlesDb));
@@ -295,23 +294,20 @@ public class JsonHandler{
         PreparedStatement ps3=cn.prepareStatement("update thousand_battles set battles=battles+?, wins=wins+? where wotb_id=? and tank_id=?");
         PreparedStatement ps4=cn.prepareStatement("select tank_id,battles,wins from thousand_battles where wotb_id=?")){
             int battleCount=UtilityClass.MAX_BATTLE_COUNT;
-            if(battles<=battleCount-1){
-                int remainingBattles=battleCount-battles;
-
+            int remainingBattles=battleCount-battles;
+            if(battles<battleCount){
                 for(List<String> tankIdList:new GetData().getTankLists(accId)){
-                    JsonElement je2=new GsonBuilder().create().toJsonTree(JsonParser.parseString(getData(new GetData().getRealm(accId)+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=tank_id%2Call.battles%2Call.wins&tank_id="+String.join(",",tankIdList))));
-                    JsonObject data2=je2.getAsJsonObject().getAsJsonObject("data");
-
-                    if(!data2.isEmpty()){
-                        for(JsonElement val2:data2.getAsJsonArray(UtilityClass.getJsonKeyName(data2.keySet()))){
+                    JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(getData(new GetData().getRealm(accId)+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=tank_id%2Call.battles%2Call.wins&tank_id="+String.join(",",tankIdList))));
+                    JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
+                    if(!data.isEmpty()){
+                        for(JsonElement val2:data.getAsJsonArray(UtilityClass.getJsonKeyName(data.keySet()))){
                             JsonObject val3=val2.getAsJsonObject();
                             JsonObject val4=val3.getAsJsonObject("all");
 
                             int battles2=val4.get("battles").getAsInt();
                             int wins=val4.get("wins").getAsInt();
                             int tankId=val3.get("tank_id").getAsInt();
-                            int battlesToAdd=Math.min(remainingBattles,battles2);
-
+                            
                             ps2.setInt(1,accId);
                             ps2.setInt(2,tankId);
                             try(ResultSet rs=ps2.executeQuery()){
@@ -319,7 +315,7 @@ public class JsonHandler{
                                     new UtilityClass().log(Level.INFO,accId+" tiene tanque nuevo: "+tankId);
                                     ps.setInt(1,accId);
                                     ps.setInt(2,tankId);
-                                    ps.setInt(3,battlesToAdd);
+                                    ps.setInt(3,battles2);
                                     ps.setInt(4,wins);
                                     ps.executeUpdate();
                                 }
@@ -334,7 +330,7 @@ public class JsonHandler{
 
                                     if(tankIdDb==tankId&&(battles2!=battlesDb||wins!=winsDb)){
                                         new UtilityClass().log(Level.INFO,"si hay cambios de "+accId+", del tanque "+tankId);
-                                        ps3.setInt(1,UtilityClass.calculateDifference(battlesToAdd,battlesDb));
+                                        ps3.setInt(1,UtilityClass.calculateDifference(battles2,battlesDb));
                                         ps3.setInt(2,UtilityClass.calculateDifference(wins,winsDb));
                                         ps3.setInt(3,accId);
                                         ps3.setInt(4,tankId);
@@ -343,7 +339,7 @@ public class JsonHandler{
                                 }
                             }
 
-                            remainingBattles-=battlesToAdd;
+                            remainingBattles-=Math.min(remainingBattles,battles2);
                             if(remainingBattles<=0){
                                 break;
                             }
