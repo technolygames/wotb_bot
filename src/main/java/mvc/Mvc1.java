@@ -1,7 +1,6 @@
 package mvc;
 
 /**
- *
  * @author erick
  */
 public class Mvc1{

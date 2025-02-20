@@ -1,4 +1,7 @@
 /target/
+/data/
 /data/.env
 *.env
 .env
+*.log
+*.logs

@@ -10,13 +10,17 @@ import java.sql.PreparedStatement;
 import java.util.logging.Level;
 
 /**
- *
  * @author erick
  */
 public class InsertData{
+    /**
+     * @param clanId
+     * @param clantag
+     * @param realm
+     */
     public void setClanInfo(int clanId,String clantag,String realm){
-        try(Connection cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("insert into clan_data values(?,?,?)")){
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("insert into clan_data values(?,?,?)")){
             ps.setInt(1,clanId);
             ps.setString(2,clantag);
             ps.setString(3,realm);
@@ -33,22 +37,26 @@ public class InsertData{
      * @param realm
      */
     public void teamRegistration(int clanId,int wotbId,String discordId,String realm){
-        try(Connection cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("insert into team values(?,?,?,?)")){
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("insert into team values(?,?,?,?)")){
             ps.setInt(1,clanId);
             ps.setInt(2,wotbId);
             ps.setString(3,discordId);
             ps.setString(4,realm);
-            ps.addBatch();
-            ps.executeBatch();
+            ps.executeUpdate();
         }catch(SQLException e){
             new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
         }
     }
-    
+
+    /**
+     * @param accId
+     * @param nickname
+     * @param realm
+     */
     public void registerPlayer(int accId,String nickname,String realm){
-        try(Connection cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("insert into user_data values(?,?,?)")){
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("insert into user_data values(?,?,?)")){
             ps.setInt(1,accId);
             ps.setString(2,nickname);
             ps.setString(3,realm);

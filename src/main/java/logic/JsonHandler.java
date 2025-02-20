@@ -7,16 +7,8 @@ import dbconnection.UpdateData;
 import dbconnection.DbConnection;
 import dbconnection.DeleteData;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
+import java.util.Map;
 import java.util.List;
-import java.net.URL;
-import java.net.ProtocolException;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.sql.ResultSet;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -27,8 +19,6 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonElement;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
-
-import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 
 /**
@@ -43,17 +33,27 @@ public class JsonHandler{
      * @return in-game name and user ID used to get info from the api.
     */
     public Mvc1 getAccountData(String nickname,String realm){
+        Mvc1 model=new Mvc1();
+        WebControl wc=new WebControl();
+        UtilityClass uc=new UtilityClass();
         try{
-            JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(getData(UtilityClass.getRealm(realm)+"/wotb/account/list/?application_id="+UtilityClass.APP_ID+"&search="+nickname)));
-            JsonObject data=je.getAsJsonObject().getAsJsonArray("data").get(0).getAsJsonObject();
-            Mvc1 model=new Mvc1();
-            model.setNickname(data.get("nickname").getAsString());
-            model.setAcoountId(data.get("account_id").getAsInt());
-            return model;
-        }catch(IllegalStateException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
-            return null;
+            String api=uc.getRealm(realm);
+            if(wc.checkConnection(api)){
+                JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(wc.getData(api+"/wotb/account/list/?application_id="+UtilityClass.APP_ID+"&search="+nickname)));
+                JsonArray data=je.getAsJsonObject().getAsJsonArray("data");
+                for(int i=0;i<data.size();i++){
+                    JsonObject val=data.get(i).getAsJsonObject();
+                    String val2=val.get("nickname").getAsString();
+                    if(val2.equals(nickname)){
+                        model.setNickname(val2);
+                        model.setAcoountId(val.get("account_id").getAsInt());
+                    }
+                }
+            }
+        }catch(IllegalStateException|IndexOutOfBoundsException e){
+            uc.log(Level.SEVERE,e.getMessage(),e);
         }
+        return model;
     }
 
     /**
@@ -62,18 +62,24 @@ public class JsonHandler{
      * @return
      */
     public Mvc1 getAccountData(int accId,String realm){
+        Mvc1 model=new Mvc1();
+        WebControl wc=new WebControl();
+        UtilityClass uc=new UtilityClass();
         try{
-            JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(getData(UtilityClass.getRealm(realm)+"/wotb/account/info/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=nickname")));
-            JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
-            JsonObject data2=data.getAsJsonObject(UtilityClass.getJsonKeyName(data.keySet()));
-            Mvc1 model=new Mvc1();
-            model.setNickname(data2.get("nickname").getAsString());
-            model.setAcoountId(accId);
-            return model;
+            String api=uc.getRealm(realm);
+            if(wc.checkConnection(api)){
+                JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(wc.getData(api+"/wotb/account/info/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=nickname")));
+                JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
+                for(String keyValues:data.keySet()){
+                    JsonObject val=data.getAsJsonObject(keyValues);
+                    model.setNickname(val.get("nickname").getAsString());
+                    model.setAcoountId(accId);
+                }
+            }
         }catch(IllegalStateException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
-            return null;
+            uc.log(Level.SEVERE,e.getMessage(),e);
         }
+        return model;
     }
 
     /**
@@ -82,25 +88,28 @@ public class JsonHandler{
      * @return
      */
     public Mvc2 getClanData(String clantag,String realm){
+        Mvc2 model=new Mvc2();
+        WebControl wc=new WebControl();
+        UtilityClass uc=new UtilityClass();
         try{
-            JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(getData(UtilityClass.getRealm(realm)+"/wotb/clans/list/?application_id=fd14e112652ef853caa088328cd5a67d&search="+clantag+"&fields=clan_id%2Ctag")));
-            JsonObject data=je.getAsJsonObject().getAsJsonObject("meta");
-            JsonArray data2=je.getAsJsonObject().getAsJsonArray("data");
-            Mvc2 model=new Mvc2();
-            for(int i=0;i<data.get("total").getAsInt();i++){
-                JsonObject val=data2.get(i).getAsJsonObject();
-                String val1=val.get("tag").getAsString();
-                if(val1.equals(clantag)){
-                    model.setClanId(val.get("clan_id").getAsInt());
-                    model.setClantag(val.get("tag").getAsString());
-                    model.setRealm(realm);
+            String api=uc.getRealm(realm);
+            if(wc.checkConnection(api)){
+                JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(wc.getData(api+"/wotb/clans/list/?application_id=fd14e112652ef853caa088328cd5a67d&search="+clantag+"&fields=clan_id%2Ctag")));
+                JsonArray data=je.getAsJsonObject().getAsJsonArray("data");
+                for(int i=0;i<data.size();i++){
+                    JsonObject val=data.get(i).getAsJsonObject();
+                    String apiClantag=val.get("tag").getAsString();
+                    if(apiClantag.equals(clantag)){
+                        model.setClanId(val.get("clan_id").getAsInt());
+                        model.setClantag(apiClantag);
+                        model.setRealm(realm);
+                    }
                 }
             }
-            return model;
-        }catch(IllegalStateException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
-            return null;
+        }catch(IllegalStateException|IndexOutOfBoundsException e){
+            uc.log(Level.SEVERE,e.getMessage(),e);
         }
+        return model;
     }
 
     /**
@@ -108,112 +117,97 @@ public class JsonHandler{
      * @param accId
      */
     public void getAccTankData(int accId){
-        try(Connection cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("insert into tank_stats values(?,?,?,?)");
-        PreparedStatement ps2=cn.prepareStatement("select tank_id from tank_stats where wotb_id=?")){
-            JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(getData(new GetData().getRealm(accId)+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&tank_id="+new GetData().getTierTenTankList()+"&fields=tank_id%2Call.battles%2Call.wins")));
-            JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
-            if(!data.isEmpty()){
-                for(var val2:data.getAsJsonArray(UtilityClass.getJsonKeyName(data.keySet()))){
-                    var val3=val2.getAsJsonObject();
-                    var val4=val3.getAsJsonObject("all");
-                    var tankId=val3.get("tank_id").getAsInt();
+        WebControl wc=new WebControl();
+        GetData gd=new GetData();
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("insert into tank_stats values(?,?,?,?)");
+                PreparedStatement ps2=cn.prepareStatement("select tank_id from tank_stats where wotb_id=?")){
+            String api=gd.getRealm(accId);
+            if(wc.checkConnection(api)){
+                JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(wc.getData(api+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&tank_id="+gd.getTierTenTankList()+"&fields=tank_id%2Call.battles%2Call.wins")));
+                JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
+                if(!data.isEmpty()){
+                    for(String keyValues:data.keySet()){
+                        for(JsonElement val2:data.getAsJsonArray(keyValues)){
+                            JsonObject val3=val2.getAsJsonObject();
+                            JsonObject val4=val3.getAsJsonObject("all");
 
-                    ps2.setInt(1,accId);
-                    try(ResultSet rs=ps2.executeQuery()){
-                        if(!rs.next()){
-                            ps.setInt(1,accId);
-                            ps.setInt(2,tankId);
-                            ps.setInt(3,val4.get("battles").getAsInt());
-                            ps.setInt(4,val4.get("wins").getAsInt());
-                            
-                            ps.addBatch();
+                            ps2.setInt(1,accId);
+                            try(ResultSet rs=ps2.executeQuery()){
+                                if(!rs.next()){
+                                    int battles=val4.get("battles").getAsInt();
+                                    int wins=val4.get("wins").getAsInt();
+                                    if(battles!=0&&wins!=0){
+                                        ps.setInt(1,accId);
+                                        ps.setInt(2,val3.get("tank_id").getAsInt());
+                                        ps.setInt(3,battles);
+                                        ps.setInt(4,wins);
+                                        ps.executeUpdate();
+                                    }
+                                }
+                            }
                         }
                     }
+                    dataValidation(accId);
                 }
-                ps.executeBatch();
-                dataValidation(accId);
             }
-        }catch(SQLException e){
+        }catch(SQLException|IllegalStateException e){
             new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
-        }catch(IllegalStateException x){
-            new UtilityClass().log(Level.SEVERE,x.getMessage(),x);
         }
     }
 
     /**
      * @param accId
      */
-    public void dataValidation(int accId){
-        try(Connection cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("select sum(battles) as battles from tank_stats where wotb_id=?");
-        PreparedStatement ps2=cn.prepareStatement("select tank_id from tank_data where tank_tier=?");
-        PreparedStatement ps3=cn.prepareStatement("insert into thousand_battles values(?,?,?,?)");
-        PreparedStatement ps4=cn.prepareStatement("select tank_id from thousand_battles where wotb_id=?")){
-            List<List<String>> tankIdLists=new ArrayList<>();
-            List<String> currentTankIdList=new ArrayList<>();
-            tankIdLists.add(currentTankIdList);
+    protected void dataValidation(int accId){
+        WebControl wc=new WebControl();
+        GetData gd=new GetData();
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("select sum(battles) as battles from tank_stats where wotb_id=?");
+                PreparedStatement ps2=cn.prepareStatement("insert into thousand_battles values(?,?,?,?)");
+                PreparedStatement ps3=cn.prepareStatement("select tank_id from thousand_battles where wotb_id=? and tank_id=?")){
+            int battles=0;
 
-            int currentTier=9;
-            int totalWins=0;
-            int maxWins=UtilityClass.MAX_BATTLE_COUNT;
-            int remainingWins=maxWins;
-
-            for(int i=9;i>=5;i--){
-                ps2.setInt(1,i);
-                try(ResultSet rs2=ps2.executeQuery()){
-                    while(rs2.next()){
-                        String tankId=rs2.getString("tank_id");
-                        if(currentTankIdList.size()==100){
-                            currentTankIdList=new ArrayList<>();
-                            tankIdLists.add(currentTankIdList);
-                        }
-                        currentTankIdList.add(tankId);
-                    }
+            ps.setInt(1,accId);
+            try(ResultSet rs2=ps.executeQuery()){
+                if(rs2.next()){
+                    battles=rs2.getInt("battles");
                 }
-                currentTier=i;
             }
 
-            for(List<String> tankIdList:tankIdLists){
-                JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(getData(new GetData().getRealm(accId)+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=tank_id%2Call.battles%2Call.wins&tank_id="+String.join(",",tankIdList))));
-                JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
-                if(!data.isEmpty()){
-                    for(JsonElement val2:data.getAsJsonArray(UtilityClass.getJsonKeyName(data.keySet()))){
-                        JsonObject val3=val2.getAsJsonObject();
-                        JsonObject val4=val3.getAsJsonObject("all");
+            if(battles<UtilityClass.MAX_BATTLE_COUNT){
+                for(List<String> tankIdList:gd.getTankLists()){
+                    String api=gd.getRealm(accId);
+                    if(wc.checkConnection(api)){
+                        JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(wc.getData(api+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=tank_id%2Call.battles%2Call.wins&tank_id="+String.join(",",tankIdList))));
+                        JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
+                        if(!data.isEmpty()){
+                            for(String keyValues:data.keySet()){
+                                for(JsonElement val2:data.getAsJsonArray(keyValues)){
+                                    JsonObject val3=val2.getAsJsonObject();
+                                    JsonObject val4=val3.getAsJsonObject("all");
 
-                        int apiBattles=val4.get("battles").getAsInt();
-                        int apiWins=val4.get("wins").getAsInt();
-
-                        ps.setInt(1,accId);
-                        ps4.setInt(1,accId);
-                        try(ResultSet rs=ps.executeQuery();
-                        ResultSet rs3=ps4.executeQuery()){
-                            if(rs.next()||!rs3.next()){
-                                int battles=rs.getInt("battles");
-                                if(battles<maxWins){
-                                    if(currentTier==5&&remainingWins<150){
-                                        apiWins=0;
-                                    }
-
-                                    totalWins+=apiWins;
-                                    remainingWins=maxWins-totalWins;
+                                    int tankId=val3.get("tank_id").getAsInt();
 
                                     ps3.setInt(1,accId);
-                                    ps3.setInt(2,val3.get("tank_id").getAsInt());
-                                    ps3.setInt(3,apiBattles);
-                                    ps3.setInt(4,apiWins);
-                                    ps3.addBatch();
-
-                                    if(totalWins>=maxWins){
-                                        ps3.executeBatch();
-                                        return;
+                                    ps3.setInt(2,tankId);
+                                    try(ResultSet rs3=ps3.executeQuery()){
+                                        if(!rs3.next()){
+                                            int battles2=val4.get("battles").getAsInt();
+                                            int wins=val4.get("wins").getAsInt();
+                                            if(battles!=0&&wins!=0){
+                                                ps2.setInt(1,accId);
+                                                ps2.setInt(2,tankId);
+                                                ps2.setInt(3,battles2);
+                                                ps2.setInt(4,wins);
+                                                ps2.executeUpdate();
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                    ps3.executeBatch();
                 }
             }
         }catch(SQLException e){
@@ -225,123 +219,140 @@ public class JsonHandler{
      * @param accId
      */
     public void dataManipulation(int accId){
-        try(Connection cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("select tank_id,battles,wins from tank_stats where wotb_id=?");
-        PreparedStatement ps2=cn.prepareStatement("update tank_stats set battles=battles+?, wins=wins+? where wotb_id=? and tank_id=?");
-        PreparedStatement ps3=cn.prepareStatement("insert into tank_stats values(?,?,?,?)");
-        PreparedStatement ps4=cn.prepareStatement("select tank_id from tank_stats where wotb_id=? and tank_id=?")){
-            updatePlayerNickname(accId);
-            JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(getData(new GetData().getRealm(accId)+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&fields=tank_id%2Call.battles%2Call.wins&tank_id="+new GetData().getTierTenTankList()+"&account_id="+accId)));
-            JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
-            int totalTier10Battles=0;
-            
-            if(!data.isEmpty()){
-                for(JsonElement val2:data.getAsJsonArray(UtilityClass.getJsonKeyName(data.keySet()))){
-                    JsonObject val3=val2.getAsJsonObject();
-                    JsonObject val4=val3.getAsJsonObject("all");
-
-                    int battles=val4.get("battles").getAsInt();
-                    int wins=val4.get("wins").getAsInt();
-                    int tankId=val3.get("tank_id").getAsInt();
-    
-                    totalTier10Battles+=battles;
-
-                    ps4.setInt(1,accId);
-                    ps4.setInt(2,tankId);
-                    try(ResultSet rs=ps4.executeQuery()){
-                        if(!rs.next()){
-                            new UtilityClass().log(Level.INFO,accId+" tiene tanque nuevo: "+tankId);
-                            ps3.setInt(1,accId);
-                            ps3.setInt(2,tankId);
-                            ps3.setInt(3,battles);
-                            ps3.setInt(4,wins);
-                            ps3.executeUpdate();
-                        }
-                    }
-
-                    ps.setInt(1,accId);
-                    try(ResultSet rs2=ps.executeQuery()){
-                        while(rs2.next()){
-                            int battlesDb=rs2.getInt("battles");
-                            int winsDb=rs2.getInt("wins");
-                            int tankIdDb=rs2.getInt("tank_id");
-                            if(tankIdDb==tankId&&(battles!=battlesDb||wins!=winsDb)){
-                                new UtilityClass().log(Level.INFO,"si hay cambios de "+accId+", del tanque "+tankId);
-                                ps2.setInt(1,UtilityClass.calculateDifference(battles,battlesDb));
-                                ps2.setInt(2,UtilityClass.calculateDifference(wins,winsDb));
-                                ps2.setInt(3,accId);
-                                ps2.setInt(4,tankId);
-                                ps2.executeUpdate();
-                            }
-                        }
-                    }
-                }
-            }
-            thousandBattlesDataManipulation(accId,totalTier10Battles);
-        }catch(SQLException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
-        }
-    }
-
-    /**
-     * @param accId
-     * @param battles
-     */
-    public void thousandBattlesDataManipulation(int accId,int battles){
-        try(Connection cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("insert into thousand_battles values(?,?,?,?)");
-        PreparedStatement ps2=cn.prepareStatement("select tank_id from thousand_battles where wotb_id=? and tank_id=?");
-        PreparedStatement ps3=cn.prepareStatement("update thousand_battles set battles=battles+?, wins=wins+? where wotb_id=? and tank_id=?");
-        PreparedStatement ps4=cn.prepareStatement("select tank_id,battles,wins from thousand_battles where wotb_id=?")){
-            int battleCount=UtilityClass.MAX_BATTLE_COUNT;
-            int remainingBattles=battleCount-battles;
-            if(battles<battleCount){
-                for(List<String> tankIdList:new GetData().getTankLists(accId)){
-                    JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(getData(new GetData().getRealm(accId)+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=tank_id%2Call.battles%2Call.wins&tank_id="+String.join(",",tankIdList))));
-                    JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
-                    if(!data.isEmpty()){
-                        for(JsonElement val2:data.getAsJsonArray(UtilityClass.getJsonKeyName(data.keySet()))){
+        WebControl wc=new WebControl();
+        GetData gd=new GetData();
+        UtilityClass uc=new UtilityClass();
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("select tank_id,battles,wins from tank_stats where wotb_id=?");
+                PreparedStatement ps2=cn.prepareStatement("update tank_stats set battles=battles+?, wins=wins+? where wotb_id=? and tank_id=?");
+                PreparedStatement ps3=cn.prepareStatement("insert into tank_stats values(?,?,?,?)");
+                PreparedStatement ps4=cn.prepareStatement("select tank_id from tank_stats where wotb_id=? and tank_id=?")){
+            String api=gd.getRealm(accId);
+            if(wc.checkConnection(api)){
+                JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(wc.getData(api+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&fields=tank_id%2Call.battles%2Call.wins&tank_id="+gd.getTierTenTankList()+"&account_id="+accId)));
+                JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
+                if(!data.isEmpty()){
+                    for(String keyValues:data.keySet()){
+                        for(JsonElement val2:data.getAsJsonArray(keyValues)){
                             JsonObject val3=val2.getAsJsonObject();
                             JsonObject val4=val3.getAsJsonObject("all");
 
-                            int battles2=val4.get("battles").getAsInt();
-                            int wins=val4.get("wins").getAsInt();
-                            int tankId=val3.get("tank_id").getAsInt();
-                            
-                            ps2.setInt(1,accId);
-                            ps2.setInt(2,tankId);
-                            try(ResultSet rs=ps2.executeQuery()){
-                                if(!rs.next()){
-                                    new UtilityClass().log(Level.INFO,accId+" tiene tanque nuevo: "+tankId);
-                                    ps.setInt(1,accId);
-                                    ps.setInt(2,tankId);
-                                    ps.setInt(3,battles2);
-                                    ps.setInt(4,wins);
-                                    ps.executeUpdate();
-                                }
-                            }
+                            int apiBattles=val4.get("battles").getAsInt();
+                            int apiWins=val4.get("wins").getAsInt();
+                            int apiTankId=val3.get("tank_id").getAsInt();
 
-                            ps4.setInt(1,accId);
-                            try(ResultSet rs2=ps4.executeQuery()){
-                                while(rs2.next()){
-                                    int battlesDb=rs2.getInt("battles");
-                                    int winsDb=rs2.getInt("wins");
-                                    int tankIdDb=rs2.getInt("tank_id");
-
-                                    if(tankIdDb==tankId&&(battles2!=battlesDb||wins!=winsDb)){
-                                        new UtilityClass().log(Level.INFO,"si hay cambios de "+accId+", del tanque "+tankId);
-                                        ps3.setInt(1,UtilityClass.calculateDifference(battles2,battlesDb));
-                                        ps3.setInt(2,UtilityClass.calculateDifference(wins,winsDb));
-                                        ps3.setInt(3,accId);
-                                        ps3.setInt(4,tankId);
+                            if(apiBattles!=0&&apiWins!=0){
+                                ps4.setInt(1,accId);
+                                ps4.setInt(2,apiTankId);
+                                try(ResultSet rs=ps4.executeQuery()){
+                                    if(!rs.next()){
+                                        uc.log(Level.INFO,accId+" tiene tanque nuevo: "+apiTankId);
+                                        ps3.setInt(1,accId);
+                                        ps3.setInt(2,apiTankId);
+                                        ps3.setInt(3,apiBattles);
+                                        ps3.setInt(4,apiWins);
                                         ps3.executeUpdate();
                                     }
                                 }
                             }
 
-                            remainingBattles-=Math.min(remainingBattles,battles2);
-                            if(remainingBattles<=0){
-                                break;
+                            ps.setInt(1,accId);
+                            try(ResultSet rs2=ps.executeQuery()){
+                                while(rs2.next()){
+                                    int dbBattles=rs2.getInt("battles");
+                                    int dbWins=rs2.getInt("wins");
+                                    int dbTankId=rs2.getInt("tank_id");
+                                    if(dbTankId==apiTankId&&(apiBattles!=dbBattles||apiWins!=dbWins)){
+                                        uc.log(Level.INFO,"si hay cambios de "+accId+", del tanque "+apiTankId);
+                                        ps2.setInt(1,UtilityClass.calculateDifference(apiBattles,dbBattles));
+                                        ps2.setInt(2,UtilityClass.calculateDifference(apiWins,dbWins));
+                                        ps2.setInt(3,accId);
+                                        ps2.setInt(4,apiTankId);
+                                        ps2.executeUpdate();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    thousandBattlesDataManipulation(accId);
+                }
+            }
+        }catch(SQLException e){
+            uc.log(Level.SEVERE,e.getMessage(),e);
+        }
+    }
+
+    /**
+     * @param accId
+     */
+    protected void thousandBattlesDataManipulation(int accId){
+        WebControl wc=new WebControl();
+        GetData gd=new GetData();
+        UtilityClass uc=new UtilityClass();
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("insert into thousand_battles values(?,?,?,?)");
+                PreparedStatement ps2=cn.prepareStatement("select tank_id from thousand_battles where wotb_id=? and tank_id=?");
+                PreparedStatement ps3=cn.prepareStatement("update thousand_battles set battles=battles+?, wins=wins+? where wotb_id=? and tank_id=?");
+                PreparedStatement ps4=cn.prepareStatement("select tank_id,battles,wins from thousand_battles where wotb_id=?");
+                PreparedStatement ps5=cn.prepareStatement("select sum(battles) as battles from tank_stats where wotb_id=?")){
+            int battles=0;
+            
+            ps5.setInt(1,accId);
+            try(ResultSet rs2=ps5.executeQuery()){
+                if(rs2.next()){
+                    battles=rs2.getInt("battles");
+                }
+            }
+            
+            if(battles<UtilityClass.MAX_BATTLE_COUNT){
+                for(List<String> tankIdList:gd.getTankLists()){
+                    String api=gd.getRealm(accId);
+                    if(wc.checkConnection(api)){
+                        JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(wc.getData(api+"/wotb/tanks/stats/?application_id="+UtilityClass.APP_ID+"&account_id="+accId+"&fields=tank_id%2Call.battles%2Call.wins&tank_id="+String.join(",",tankIdList))));
+                        JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
+                        if(!data.isEmpty()){
+                            for(String keyValues:data.keySet()){
+                                for(JsonElement val2:data.getAsJsonArray(keyValues)){
+                                    JsonObject val3=val2.getAsJsonObject();
+                                    JsonObject val4=val3.getAsJsonObject("all");
+
+                                    int apiBattles=val4.get("battles").getAsInt();
+                                    int apiWins=val4.get("wins").getAsInt();
+                                    int apiTankId=val3.get("tank_id").getAsInt();
+
+                                    if(apiBattles!=0&&apiWins!=0){
+                                        ps2.setInt(1,accId);
+                                        ps2.setInt(2,apiTankId);
+                                        try(ResultSet rs=ps2.executeQuery()){
+                                            if(!rs.next()){
+                                                uc.log(Level.INFO,accId+" tiene tanque nuevo: "+apiTankId);
+                                                ps.setInt(1,accId);
+                                                ps.setInt(2,apiTankId);
+                                                ps.setInt(3,apiBattles);
+                                                ps.setInt(4,apiWins);
+                                                ps.executeUpdate();
+                                            }   
+                                        }
+                                    }
+
+                                    ps4.setInt(1,accId);
+                                    try(ResultSet rs2=ps4.executeQuery()){
+                                        while(rs2.next()){
+                                            int dbBattles=rs2.getInt("battles");
+                                            int dbWins=rs2.getInt("wins");
+                                            int dbTankId=rs2.getInt("tank_id");
+
+                                            if(dbTankId==apiTankId&&(apiBattles!=dbBattles||apiWins!=dbWins)){
+                                                uc.log(Level.INFO,"si hay cambios de "+accId+", del tanque "+apiTankId);
+                                                ps3.setInt(1,UtilityClass.calculateDifference(apiBattles,dbBattles));
+                                                ps3.setInt(2,UtilityClass.calculateDifference(apiWins,dbWins));
+                                                ps3.setInt(3,accId);
+                                                ps3.setInt(4,apiTankId);
+                                                ps3.executeUpdate();
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -350,96 +361,81 @@ public class JsonHandler{
                 new DeleteData().freeupThousandBattles(accId);
             }
         }catch(SQLException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
+            uc.log(Level.SEVERE,e.getMessage(),e);
         }
     }
 
     /**
-     * @param wotbId
     */
-    protected void updatePlayerNickname(int wotbId){
-        try(Connection cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("select nickname,realm from user_data where wotb_id=?")){
-            ps.setInt(1,wotbId);
-            try(ResultSet rs=ps.executeQuery()){
-                if(rs.next()){
-                    JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(getData(UtilityClass.getRealm(rs.getString("realm"))+"/wotb/account/info/?application_id="+UtilityClass.APP_ID+"&fields=nickname&account_id="+wotbId)));
-                    JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
-                    if(!data.isEmpty()){
-                        JsonObject playerData=data.getAsJsonObject(UtilityClass.getJsonKeyName(data.keySet()));
-                        String apiNickname=playerData.get("nickname").getAsString();
-                        if(!rs.getString("nickname").equals(apiNickname)){
-                            new UpdateData().updateNickname(apiNickname,wotbId);
+    protected void updatePlayerNickname(){
+        WebControl wc=new WebControl();
+        UtilityClass uc=new UtilityClass();
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("select nickname from user_data where wotb_id=?")){
+            for(Map.Entry<String,List<String>> entry:new GetData().getPlayersLists().entrySet()){
+                List<String> list=entry.getValue();
+                if(!list.isEmpty()){
+                    String api=uc.getRealm(entry.getKey());
+                    if(wc.checkConnection(api)){
+                        JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(wc.getData(api+"/wotb/account/info/?application_id="+UtilityClass.APP_ID+"&fields=nickname&account_id="+String.join(",",list))));
+                        JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
+                        if(data!=null&&!data.isEmpty()){
+                            for(String keyValue:data.keySet()){
+                                int user=Integer.parseInt(keyValue);
+                                ps.setInt(1,user);
+                                try(ResultSet rs=ps.executeQuery()){
+                                    if(rs.next()){
+                                        JsonObject playerData=data.getAsJsonObject(keyValue);
+                                        String apiNickname=playerData.get("nickname").getAsString();
+                                        if(!rs.getString("nickname").equals(apiNickname)){
+                                            new UpdateData().updateNickname(apiNickname,user);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
-        }catch(SQLException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
-        }catch(IllegalStateException x){
-            new UtilityClass().log(Level.SEVERE,x.getMessage(),x);
-        }catch(NullPointerException s){
-            new UtilityClass().log(Level.SEVERE,s.getMessage(),s);
+        }catch(SQLException|IllegalStateException|NullPointerException e){
+            uc.log(Level.SEVERE,e.getMessage(),e);
         }
     }
 
     /**
-     * @param clanId
      */
-    protected void updateClantag(int clanId){
-        try(Connection cn=DbConnection.getConnection();
-        PreparedStatement ps=cn.prepareStatement("select clantag,realm from clan_data where clan_id=?")){
-            ps.setInt(1,clanId);
-            try(ResultSet rs=ps.executeQuery()){
-                if(rs.next()){
-                    String realm=rs.getString("realm");
-                    JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(getData(UtilityClass.getRealm(realm)+"/wotb/clans/info/?application_id="+UtilityClass.APP_ID+"&clan_id="+clanId+"&fields=tag")));
-                    JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
-                    if(!data.isEmpty()){
-                        JsonObject clanData=data.getAsJsonObject(UtilityClass.getJsonKeyName(data.keySet()));
-                        String apiClantag=clanData.get("tag").getAsString();
-                        if(!rs.getString("clantag").equals(apiClantag)){
-                            new UpdateData().updateClantag(apiClantag,clanId,realm);
+    protected void updateClantag(){
+        WebControl wc=new WebControl();
+        UtilityClass uc=new UtilityClass();
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("select clantag,realm from clan_data where clan_id=?")){
+            for(Map.Entry<String,List<String>> entry:new GetData().getClanLists().entrySet()){
+                List<String> list=entry.getValue();
+                if(!list.isEmpty()){
+                    String api=uc.getRealm(entry.getKey());
+                    if(wc.checkConnection(api)){
+                        JsonElement je=new GsonBuilder().create().toJsonTree(JsonParser.parseString(wc.getData(api+"/wotb/clans/info/?application_id="+UtilityClass.APP_ID+"&clan_id="+String.join(",",list)+"&fields=tag")));
+                        JsonObject data=je.getAsJsonObject().getAsJsonObject("data");
+                        if(data!=null&&!data.isEmpty()){
+                            for(String keyValue:data.keySet()){
+                                int clanId=Integer.parseInt(keyValue);
+                                ps.setInt(1,clanId);
+                                try(ResultSet rs=ps.executeQuery()){
+                                    if(rs.next()){
+                                        JsonObject clanData=data.getAsJsonObject(keyValue);
+                                        String apiClantag=clanData.get("tag").getAsString();
+                                        if(!rs.getString("clantag").equals(apiClantag)){
+                                            new UpdateData().updateClantag(apiClantag,clanId,rs.getString("realm"));
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
-        }catch(SQLException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
-        }
-    }
-
-    /**
-     * Makes requests to the WG's public API
-     * @param link
-     * @return data from WG's API
-     */
-    protected String getData(String link){
-        try{
-            URL u=new URL(link);
-            HttpURLConnection u2=(HttpURLConnection)u.openConnection();
-            u2.setRequestMethod("GET");
-            u2.setRequestProperty("Accept","application/json");
-            String line="";
-            if(u2.getResponseCode()==HttpURLConnection.HTTP_OK){
-                try(InputStream is=u2.getInputStream();
-                InputStreamReader isr=new InputStreamReader(is,StandardCharsets.UTF_8);
-                BufferedReader br=new BufferedReader(isr)){
-                    for(String line2;(line2=br.readLine())!=null;){
-                        line=line2;
-                    }
-                }
-            }
-            return line;
-        }catch(ProtocolException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
-            return null;
-        }catch(MalformedURLException x){
-            new UtilityClass().log(Level.SEVERE,x.getMessage(),x);
-            return null;
-        }catch(IOException s){
-            new UtilityClass().log(Level.SEVERE,s.getMessage(),s);
-            return null;
+        }catch(SQLException|IllegalStateException|NullPointerException e){
+            uc.log(Level.SEVERE,e.getMessage(),e);
         }
     }
 }

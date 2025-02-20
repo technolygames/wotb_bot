@@ -1,4 +1,8 @@
 package mvc;
+
+/**
+ * @author erick
+ */
 public class Mvc2{
     private int clanId;
     private String clantag;

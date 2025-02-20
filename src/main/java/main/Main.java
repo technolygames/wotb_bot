@@ -1,6 +1,7 @@
 package main;
 
 import logic.BotLogic;
+import logic.Concurrency;
 
 /**
  * Main method
@@ -10,6 +11,7 @@ import logic.BotLogic;
 public class Main{
     protected Main(){}
     public static void main(String[] args) throws InterruptedException{
-        new BotLogic();
+        new BotLogic().run();
+        new Concurrency().run();
     }
 }

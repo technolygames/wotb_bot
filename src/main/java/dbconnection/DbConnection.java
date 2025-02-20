@@ -14,13 +14,11 @@ import java.util.Properties;
 import java.util.logging.Level;
 
 /**
- *
  * @author erick
  */
 public class DbConnection{
-    private DbConnection(){}
-    
     protected static HikariDataSource ds;
+
     static{
         Properties p=new Properties();
         HikariConfig config=new HikariConfig();
@@ -33,21 +31,21 @@ public class DbConnection{
             config.addDataSourceProperty("prepStmtCacheSize","256");
             config.addDataSourceProperty("prepStmtCacheSqlLimit","2048");
             config.setMaximumPoolSize(50);
-            config.setMinimumIdle(10);
+            config.setMinimumIdle(5);
             ds=new HikariDataSource(config);
         }catch(IOException e){
             new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
         }
     }
 
-    public static Connection getConnection(){
+    /**
+     * @return 
+     */
+    public Connection getConnection(){
         try{
             return ds.getConnection();
-        }catch(SQLException e){
+        }catch(SQLException|NullPointerException e){
             new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
-            return null;
-        }catch(NullPointerException x){
-            new UtilityClass().log(Level.SEVERE,x.getMessage(),x);
             return null;
         }
     }

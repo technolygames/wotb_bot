@@ -1,18 +1,21 @@
 package logic;
 
 import io.github.cdimascio.dotenv.Dotenv;
+import org.apache.commons.io.FilenameUtils;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.FileInputStream;
 import java.text.DecimalFormat;
-import java.util.Set;
 import java.util.Properties;
 
+import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 /**
- *
  * @author erick
  */
 public class UtilityClass{
@@ -22,19 +25,31 @@ public class UtilityClass{
     }
 
     public static final String APP_ID=new UtilityClass().getAppID();
-    public static final int MAX_BATTLE_COUNT=2000;
-    
+    public static final int MAX_BATTLE_COUNT=new UtilityClass().getBattleCount("max_count");
+
     /**
-     * 
-     * @param keySet
-     * @return
+     * @param file
+     * @return 
      */
-    public static String getJsonKeyName(Set<String> keySet){
-        String val1="";
-        for (String val2:keySet){
-            val1=val2;
+    protected String exists(File file){
+        String parent=file.getParent();
+
+        File f=new File(parent);
+        if(!f.exists()){
+            f.mkdir();
         }
-        return val1;
+
+        String filename=file.getName();
+
+        String name=FilenameUtils.getBaseName(filename);
+        String extension=FilenameUtils.getExtension(filename);
+
+        file=new File(parent,name+"."+extension);
+        for(int i=1;file.exists();i++){
+            file=new File(parent,name+"-("+i+")."+extension);
+        }
+
+        return file.getPath();
     }
 
     /**
@@ -78,14 +93,29 @@ public class UtilityClass{
      * @param realm
      * @return
      */
-    public static String getRealm(String realm){
+    public String getRealm(String realm){
         Properties p=new Properties();
-        try(InputStream fis=ClassLoader.getSystemClassLoader().getResourceAsStream("realms.properties")){
-            p.load(fis);
+        try(InputStream is=ClassLoader.getSystemClassLoader().getResourceAsStream("realms.properties")){
+            p.load(is);
             return "https://"+p.getProperty(realm);
         }catch(IOException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
-            return "NA";
+            log(Level.SEVERE,e.getMessage(),e);
+            return null;
+        }
+    }
+
+    /**
+     * @param count
+     * @return
+     */
+    protected int getBattleCount(String count){
+        Properties p=new Properties();
+        try(FileInputStream fis=new FileInputStream("data/generic.properties")){
+            p.load(fis);
+            return Integer.parseInt(p.getProperty(count));
+        }catch(IOException e){
+            log(Level.SEVERE,e.getMessage(),e);
+            return 0;
         }
     }
 
@@ -96,13 +126,23 @@ public class UtilityClass{
     public void log(Level level,String message){
         logger.log(level,message);
     }
-    
+
     /**
      * @param level
      * @param message
      * @param thrown
      */
     public void log(Level level,String message,Throwable thrown){
-        logger.log(level,message,thrown);
+        try{
+            FileHandler fh=new FileHandler(exists(new File("data/exceptions/"+thrown.getClass().getSimpleName()+".log")));
+            fh.setFormatter(new SimpleFormatter());
+            logger.addHandler(fh);
+            logger.log(level,message,thrown);
+            
+            fh.flush();
+            fh.close();
+        }catch(IOException e){
+            log(Level.SEVERE,e.getMessage());
+        }
     }
 }
