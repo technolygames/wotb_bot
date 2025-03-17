@@ -114,26 +114,32 @@ public class GetData{
     /**
      * @return
      */
-    public Map<String,List<String>> getPlayersLists(){
-        Map<String,List<String>> accIdLists=new HashMap<>();
+    public Map<String,List<List<String>>> getPlayersLists(){
+        Map<String, List<List<String>>> accIdLists=new HashMap<>();
+        accIdLists.put("EU",new ArrayList<>());
+        accIdLists.put("NA",new ArrayList<>());
+        accIdLists.put("ASIA",new ArrayList<>());
         try(Connection cn=new DbConnection().getConnection();
                 PreparedStatement ps=cn.prepareStatement("select wotb_id from user_data where realm=?")){
-            accIdLists.put("EU",new ArrayList<>());
-            accIdLists.put("NA",new ArrayList<>());
-            accIdLists.put("ASIA",new ArrayList<>());
-
-            for(Map.Entry<String,List<String>> entry:accIdLists.entrySet()){
+            for(Map.Entry<String,List<List<String>>> entry:accIdLists.entrySet()){
                 String realm=entry.getKey();
+                List<List<String>> regionLists=entry.getValue();
+
                 ps.setString(1,realm);
                 try(ResultSet rs=ps.executeQuery()){
-                    List<String> currentAccIdList=entry.getValue();
+                    List<String> currentAccIdList=new ArrayList<>();
                     while(rs.next()){
                         String accId=rs.getString("wotb_id");
                         currentAccIdList.add(accId);
+
                         if(currentAccIdList.size()==100){
-                            currentAccIdList=new ArrayList<>();
-                            accIdLists.get(realm).addAll(currentAccIdList);
+                            regionLists.add(new ArrayList<>(currentAccIdList));
+                            currentAccIdList.clear();
                         }
+                    }
+
+                    if(!currentAccIdList.isEmpty()){
+                        regionLists.add(new ArrayList<>(currentAccIdList));
                     }
                 }
             }
@@ -146,26 +152,33 @@ public class GetData{
     /**
      * @return
      */
-    public Map<String,List<String>> getClanLists(){
-        Map<String,List<String>> clanLists=new HashMap<>();
-        try(Connection cn=new DbConnection().getConnection();
-                PreparedStatement ps=cn.prepareStatement("select clan_id from clan_data where realm=?")){
-            clanLists.put("EU",new ArrayList<>());
-            clanLists.put("NA",new ArrayList<>());
-            clanLists.put("ASIA",new ArrayList<>());
+    public Map<String,List<List<String>>> getClanLists(){
+        Map<String,List<List<String>>> clanLists=new HashMap<>();
+        clanLists.put("EU",new ArrayList<>());
+        clanLists.put("NA",new ArrayList<>());
+        clanLists.put("ASIA",new ArrayList<>());
 
-            for(Map.Entry<String,List<String>> entry:clanLists.entrySet()){
+        try (Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("select clan_id from clan_data where realm=?")){
+            for(Map.Entry<String,List<List<String>>> entry:clanLists.entrySet()){
                 String realm=entry.getKey();
+                List<List<String>> regionLists=entry.getValue();
+
                 ps.setString(1,realm);
                 try(ResultSet rs=ps.executeQuery()){
-                    List<String> currentAccIdList=entry.getValue();
+                    List<String> currentClanIdList=new ArrayList<>();
                     while(rs.next()){
-                        String accId=rs.getString("clan_id");
-                        currentAccIdList.add(accId);
-                        if(currentAccIdList.size()==100){
-                            currentAccIdList=new ArrayList<>();
-                            clanLists.get(realm).addAll(currentAccIdList);
+                        String clanId=rs.getString("clan_id");
+                        currentClanIdList.add(clanId);
+                        
+                        if(currentClanIdList.size()==100){
+                            regionLists.add(new ArrayList<>(currentClanIdList));
+                            currentClanIdList.clear();
                         }
+                    }
+
+                    if(!currentClanIdList.isEmpty()){
+                        regionLists.add(new ArrayList<>(currentClanIdList));
                     }
                 }
             }
@@ -189,7 +202,7 @@ public class GetData{
             ps.setString(2,realm);
             try(ResultSet rs=ps.executeQuery()){
                 while(rs.next()){
-                    if(rs.getString("discord_id_caller").equals(discordId)){
+                    if(rs.getLong("discord_id_caller")!=Long.parseLong(discordId)){
                         flag=true;
                     }
                 }

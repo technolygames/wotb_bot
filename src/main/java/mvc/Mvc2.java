@@ -7,6 +7,7 @@ public class Mvc2{
     private int clanId;
     private String clantag;
     private String realm;
+    private long updatedAt;
 
     public int getClanId(){
         return clanId;
@@ -35,5 +36,13 @@ public class Mvc2{
     @Override
     public String toString(){
         return "Mvc2{"+"clanId="+clanId+", clantag="+clantag+", realm="+realm+'}';
+    }
+
+    public long getUpdatedAt(){
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(long updatedAt){
+        this.updatedAt=updatedAt;
     }
 }

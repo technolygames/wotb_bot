@@ -564,10 +564,13 @@ public class BotLogic{
             try{
                 int accId=data.getAcoountId();
                 String player=data.getNickname();
+                long lastBattleTime=data.getLastBattleTime();
+                long updatedAt=data.getUpdatedAt();
 
                 int clanId=data2.getClanId();
                 String clantag=data2.getClantag();
                 String realm=data2.getRealm();
+                long updatedAt2=data2.getUpdatedAt();
 
                 if(accId!=0||clanId!=0){
                     GetData val=new GetData();
@@ -577,16 +580,16 @@ public class BotLogic{
                     
                     InsertData val2=new InsertData();
                     if(!userExists&&!clanExists){
-                        val2.setClanInfo(clanId,clantag,realm);
-                        val2.registerPlayer(accId,player,realm);
-                        val2.teamRegistration(clanId,accId,callerId,realm);
-                        eb.setColor(Color.GREEN).addField(MESSAGE_5,clantag+MESSAGE_8,false);
-                    }else if(!userExists&&!teamExists){
-                        val2.registerPlayer(accId,player,realm);
+                        val2.setClanInfo(clanId,clantag,realm,updatedAt2);
+                        val2.registerPlayer(accId,player,realm,lastBattleTime,updatedAt);
                         val2.teamRegistration(clanId,accId,callerId,realm);
                         eb.setColor(Color.GREEN).addField(MESSAGE_5,clantag+MESSAGE_8,false);
                     }else if(!clanExists){
-                        val2.setClanInfo(clanId,clantag,realm);
+                        val2.setClanInfo(clanId,clantag,realm,updatedAt2);
+                        val2.teamRegistration(clanId,accId,callerId,realm);
+                        eb.setColor(Color.GREEN).addField(MESSAGE_5,clantag+MESSAGE_8,false);
+                    }else if(!userExists&&!teamExists){
+                        val2.registerPlayer(accId,player,realm,lastBattleTime,updatedAt);
                         val2.teamRegistration(clanId,accId,callerId,realm);
                         eb.setColor(Color.GREEN).addField(MESSAGE_5,clantag+MESSAGE_8,false);
                     }else if(!teamExists){
@@ -673,9 +676,12 @@ public class BotLogic{
             try{
                 int accId=data.getAcoountId();
                 String nickname=data.getNickname();
+                long lastBattleTime=data.getLastBattleTime();
+                long updatedAt=data.getUpdatedAt();
+                
                 if(accId!=0){
                     if(!new GetData().checkUserData(accId,realm)){
-                        new InsertData().registerPlayer(accId,nickname,realm);
+                        new InsertData().registerPlayer(accId,nickname,realm,lastBattleTime,updatedAt);
                         eb.setColor(Color.GREEN).addField(MESSAGE_5,nickname+" has been registered successfully!",false);
                     }else{
                         eb.setColor(Color.YELLOW).addField(MESSAGE_4,nickname+" is already registered",false);

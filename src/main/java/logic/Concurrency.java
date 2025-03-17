@@ -21,8 +21,8 @@ public class Concurrency{
     protected Runnable scheduleUpdateData(){
         JsonHandler jh=new JsonHandler();
         return ()->{
-            jh.updatePlayerNickname();
-            jh.updateClantag();
+            jh.playerProfile();
+            jh.clanProfile();
         };
     }
 }

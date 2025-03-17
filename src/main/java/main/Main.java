@@ -10,7 +10,7 @@ import logic.Concurrency;
  */
 public class Main{
     protected Main(){}
-    public static void main(String[] args) throws InterruptedException{
+    public static void main(String[] args){
         new BotLogic().run();
         new Concurrency().run();
     }

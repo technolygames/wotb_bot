@@ -26,7 +26,7 @@ public class BotActions{
      * @param realm
      * @return
      */
-    public String teamLeaderboard(String realm){
+    public synchronized String teamLeaderboard(String realm){
         StringJoiner sb=new StringJoiner("\n");
         try(Connection cn=new DbConnection().getConnection();
                 PreparedStatement ps=cn.prepareStatement("select distinct cd.clan_id,cd.clantag from clan_data cd join team t on cd.clan_id=t.clan_id where cd.realm=?")){
@@ -42,10 +42,8 @@ public class BotActions{
 
             Collections.sort(teams,Comparator.comparingDouble(team->-team.winrate));
             for(Team team:teams){
-                if(team!=null){
-                    sb.add(count+". "+team);
-                    count++;
-                }
+                sb.add(count+". "+team);
+                count++;
             }
         }catch(SQLException e){
             new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
@@ -58,7 +56,7 @@ public class BotActions{
      * @param realm
      * @return
     */
-    public String getTeamRoster(int clanId,String realm){
+    public synchronized String getTeamRoster(int clanId,String realm){
         StringBuilder value=new StringBuilder();
         try(Connection cn=new DbConnection().getConnection();
                 PreparedStatement ps=cn.prepareStatement("select t.wotb_id,ud.nickname from team t join user_data ud on t.wotb_id=ud.wotb_id where t.clan_id=? and t.realm=?")){
@@ -92,7 +90,7 @@ public class BotActions{
      * @param server
      * @return
      */
-    public double getTeamWinrate(int clanId,String server){
+    public synchronized double getTeamWinrate(int clanId,String server){
         try(Connection cn=new DbConnection().getConnection();
                 PreparedStatement ps=cn.prepareStatement("select wotb_id from team where clan_id=? and realm=?")){
             List<Double> winrates=new ArrayList<>();
@@ -127,7 +125,7 @@ public class BotActions{
      * @param accId
      * @return
      */
-    protected double getThousandBattlesTier10Stats(int accId){
+    protected synchronized double getThousandBattlesTier10Stats(int accId){
         Mvc3 data=new GetData().getPlayerStats(accId);
         int battles=data.getBattles();
         if(battles>=UtilityClass.MAX_BATTLE_COUNT){
@@ -141,7 +139,7 @@ public class BotActions{
      * @param accId
      * @return
      */
-    public double calculatePlayerWeight(int accId){
+    public synchronized double calculatePlayerWeight(int accId){
         Map<Integer,int[]> battleData=new HashMap<>();
         try(Connection cn=new DbConnection().getConnection();
                 PreparedStatement ps=cn.prepareStatement("select sum(tb.battles) as battles, sum(tb.wins) as wins, td.tank_tier from thousand_battles tb join tank_data td on td.tank_id=tb.tank_id where tb.wotb_id=? and td.tank_tier=?")){

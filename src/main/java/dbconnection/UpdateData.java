@@ -26,7 +26,39 @@ public class UpdateData{
             new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
         }
     }
+    
+    /**
+     * @param lastTimeBattle last_battle_time
+     * @param updatedAt update_at
+     * @param accId
+     */
+    public void updateUserTimestamps(long lastTimeBattle,long updatedAt,int accId){
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps2=cn.prepareStatement("update user_data set last_battle_time=?, updated_at=? where wotb_id=?")){
+            ps2.setLong(1,lastTimeBattle);
+            ps2.setLong(2,updatedAt);
+            ps2.setInt(3,accId);
+            ps2.execute();
+        }catch(SQLException e){
+            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
+        }
+    }
 
+    /**
+     * @param updatedAt
+     * @param clanId
+     */
+    public void updateClanTimestamp(long updatedAt,int clanId){
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps2=cn.prepareStatement("update clan_data set updated_at=? where clan_id=?")){
+            ps2.setLong(1,updatedAt);
+            ps2.setInt(2,clanId);
+            ps2.executeUpdate();
+        }catch(SQLException e){
+            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
+        }
+    }
+    
     /**
      * @param clantag
      * @param clanId
