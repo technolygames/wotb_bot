@@ -5,7 +5,7 @@ package mvc;
  */
 public class Mvc1{
     private String nickname;
-    private int acoountId;
+    private long acoountId;
     private long lastBattleTime;
     private long updatedAt;
 
@@ -17,11 +17,11 @@ public class Mvc1{
         this.nickname=nickname;
     }
 
-    public int getAcoountId(){
+    public long getAcoountId(){
         return acoountId;
     }
 
-    public void setAcoountId(int acoountId){
+    public void setAcoountId(long acoountId){
         this.acoountId=acoountId;
     }
 

@@ -2,6 +2,7 @@ package logic;
 
 import dbconnection.DbConnection;
 import dbconnection.GetData;
+import interfaces.Interfaces;
 import mvc.Mvc3;
 
 import java.sql.ResultSet;
@@ -14,7 +15,7 @@ import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
-import java.util.StringJoiner;
+import java.util.LinkedHashMap;
 
 import java.util.logging.Level;
 
@@ -22,31 +23,237 @@ import java.util.logging.Level;
  * @author erick
  */
 public class BotActions{
+    private final GetData gd=new GetData();
+    private final UtilityClass uc=new UtilityClass();
+
+    /**
+     * @param tourneyId
+     * @param realm
+     * @return
+     */
+    public Map<String,List<Interfaces.LeaderboardEntry>> seedTeams(int tourneyId,String realm){
+        Map<String,List<Interfaces.LeaderboardEntry>> groups=new LinkedHashMap<>();
+        boolean strongestVsWeakest=false;
+        int teamsPerGroup=4;
+
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("select title,seed_type,teams_confirmed from tournament_data where tournament_id=?")){
+            List<Interfaces.LeaderboardEntry> teams=getIngameLeaderboardData(tourneyId,realm);
+
+            ps.setInt(1,tourneyId);
+            try(ResultSet rs=ps.executeQuery()){
+                if(rs.next()){
+                    strongestVsWeakest=rs.getString("seed_type").equalsIgnoreCase("strongest-weakest");
+                    int teamsConfirmed=rs.getInt("teams_confirmed");
+                    if(!rs.getString("title").contains("Prove your skill")&&(teamsConfirmed>0&&teamsConfirmed<32)){
+                        teamsPerGroup=8;
+                    }
+                }
+            }
+
+            if(strongestVsWeakest){
+                int totalGroups=(int)Math.ceil((double)teams.size()/teamsPerGroup);
+
+                for(int i=0;i<totalGroups;i++){
+                    List<Interfaces.LeaderboardEntry> group=new ArrayList<>();
+                    if(i<teams.size()){
+                        group.add(teams.get(i));
+                    }
+
+                    int weakIndex=teams.size()-1-i;
+                    if(weakIndex>i&&weakIndex<teams.size()){
+                        group.add(teams.get(weakIndex));
+                    }
+
+                    for(int j=1;j<teamsPerGroup/2;j++){
+                        int strongIndex=i+totalGroups*j;
+                        int weakIndex2=teams.size()-1-i-totalGroups*j;
+
+                        if(strongIndex<teams.size()){
+                            group.add(teams.get(strongIndex));
+                        }
+                        if(weakIndex2>strongIndex&&weakIndex2<teams.size()){
+                            group.add(teams.get(weakIndex2));
+                        }
+                    }
+                
+                    groups.put("Group "+(i+1),group);
+                }
+            }else{
+                int groupNumber=1;
+                List<Interfaces.LeaderboardEntry> currentGroup=new ArrayList<>();
+
+                for(int i=0;i<teams.size();i++){
+                    currentGroup.add(teams.get(i));
+
+                    if(currentGroup.size()==teamsPerGroup||i==teams.size()-1){
+                        groups.put("Group "+groupNumber++,currentGroup);
+                        currentGroup=new ArrayList<>();
+                    }
+                }
+            }
+        }catch(Exception e){
+            uc.log(Level.SEVERE,e.getMessage(),e);
+        }
+        return groups;
+    }
+    
+    /**
+     * @param teamId
+     * @param realm
+     * @return
+     */
+    public String getIngameTeamRoster(int teamId,String realm){
+        String value="";
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("SELECT ud.wotb_id, ud.nickname FROM user_data ud JOIN ingame_team t ON ud.wotb_id = t.wotb_id WHERE t.team_id = ? AND ud.realm = ?")){
+            Map<Long,String> teamPlayerData=new HashMap<>();
+
+            ps.setInt(1,teamId);
+            ps.setString(2,realm);
+            try(ResultSet rs=ps.executeQuery()){
+                while(rs.next()){
+                    long wotbId=rs.getLong("wotb_id");
+                    String nickname=rs.getString("nickname");
+                    teamPlayerData.put(wotbId,nickname);
+                }
+            }
+            value=buildRosterString(teamPlayerData);
+        }catch(SQLException e){
+            uc.log(Level.SEVERE,e.getMessage(),e);
+        }
+        return value;
+    }
+    
+    /**
+     * @param tourneyId
+     * @param realm
+     * @return
+     */
+    public List<Interfaces.LeaderboardEntry> getIngameLeaderboardData(int tourneyId,String realm){
+        List<Interfaces.LeaderboardEntry> teams=new ArrayList<>();
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement ps=cn.prepareStatement("select distinct t.team_id,t.team_name,cd.clantag from ingame_team_data t left join clan_data cd on cd.clan_id=t.clan_id where t.tournament_id=? and t.realm=?")){
+
+            ps.setInt(1,tourneyId);
+            ps.setString(2,realm);
+            try(ResultSet rs=ps.executeQuery()){
+                while(rs.next()){
+                    double winrate=getIngameTeamWinrate(rs.getInt("team_id"));
+                    if(winrate!=0.0){
+                        teams.add(new Interfaces.LeaderboardEntry(rs.getString("team_name"),rs.getString("clantag"),winrate));
+                    }
+                }
+            }
+
+            teams.sort(Comparator.comparingDouble(Interfaces.LeaderboardEntry::winrate).reversed());
+        }catch(SQLException e){
+            uc.log(Level.SEVERE,e.getMessage(),e);
+        }
+        return teams;
+    }
+    
+    /**
+     * @param teamId
+     * @return
+     */
+    public double getIngameTeamWinrate(int teamId){
+        List<Long> playerIdsInTeam=new ArrayList<>();
+        try(Connection cn=new DbConnection().getConnection();
+                PreparedStatement psGetPlayers=cn.prepareStatement("SELECT wotb_id FROM ingame_team WHERE team_id=?")){
+            psGetPlayers.setInt(1,teamId);
+            try(ResultSet rs=psGetPlayers.executeQuery()){
+                while(rs.next()){
+                    playerIdsInTeam.add(rs.getLong("wotb_id"));
+                }
+            }
+            return calculateTeamWinrateFromPlayerIds(playerIdsInTeam);
+        }catch(SQLException e){
+            uc.log(Level.SEVERE,e.getMessage(),e);
+            return 0.0;
+        }
+    }
+    
     /**
      * @param realm
      * @return
      */
-    public synchronized String teamLeaderboard(String realm){
-        StringJoiner sb=new StringJoiner("\n");
-        try(Connection cn=new DbConnection().getConnection();
-                PreparedStatement ps=cn.prepareStatement("select distinct cd.clan_id,cd.clantag from clan_data cd join team t on cd.clan_id=t.clan_id where cd.realm=?")){
-            List<Team> teams=new ArrayList<>();
-            int count=1;
+    public String teamLeaderboard(String realm){
+        StringBuilder sb=new StringBuilder();
+        try(Connection cn=new DbConnection().getConnection()){
+            Map<Integer,List<Long>> clanToPlayerIdsMap=new HashMap<>();
+            Map<Integer,String> clanDataMap=new HashMap<>();
+            List<Long> allPlayerIds=new ArrayList<>();
 
-            ps.setString(1,realm);
-            try(ResultSet rs=ps.executeQuery()){
-                while(rs.next()){
-                    teams.add(new Team(rs.getString("clantag"),getTeamWinrate(rs.getInt("clan_id"),realm)));
+            try(PreparedStatement ps=cn.prepareStatement("SELECT cd.clan_id, cd.clantag, t.wotb_id FROM clan_data cd JOIN team t ON cd.clan_id = t.clan_id WHERE cd.realm = ?")){
+                ps.setString(1,realm);
+                try(ResultSet rs=ps.executeQuery()){
+                    while(rs.next()){
+                        int clanId=rs.getInt("clan_id");
+                        String clantag=rs.getString("clantag");
+                        long wotbId=rs.getLong("wotb_id");
+
+                        clanDataMap.put(clanId,clantag);
+                        clanToPlayerIdsMap.computeIfAbsent(clanId,k->new ArrayList<>()).add(wotbId);
+                        
+                        if(!allPlayerIds.contains(wotbId)){
+                            allPlayerIds.add(wotbId);
+                        }
+                    }
                 }
             }
 
-            Collections.sort(teams,Comparator.comparingDouble(team->-team.winrate));
-            for(Team team:teams){
-                sb.add(count+". "+team);
+            if(allPlayerIds.isEmpty()){
+                return "There's no teams to show up in this leaderboard.";
+            }
+
+            Map<Long,Mvc3> batchTier10Stats=gd.getPlayerStatsInBatch(allPlayerIds);
+            Map<Long,Map<Integer,int[]>> batchLowerTierStats=gd.getLowerTierStatsInBatch(allPlayerIds);
+
+            List<Interfaces.LeaderboardEntry> teams=new ArrayList<>();
+            for(Map.Entry<Integer,List<Long>> entry:clanToPlayerIdsMap.entrySet()){
+                int clanId=entry.getKey();
+                List<Long> playerIdsInTeam=entry.getValue();
+                
+                List<Double> individualWinrates=new ArrayList<>();
+                for(Long playerId:playerIdsInTeam){
+                    Mvc3 playerT10Data=batchTier10Stats.getOrDefault(playerId,new Mvc3());
+                    Map<Integer,int[]> playerLowerData=batchLowerTierStats.getOrDefault(playerId,Collections.emptyMap());
+
+                    double effectiveWinrate=getThousandBattlesTier10Stats(playerT10Data,playerLowerData);
+                    if(effectiveWinrate>0){
+                        individualWinrates.add(effectiveWinrate);
+                    }
+                }
+                
+                if(!individualWinrates.isEmpty()){
+                    individualWinrates.sort(Collections.reverseOrder());
+                    double sumOfTopWinrates=0.0;
+                    int playersCounted=0;
+                    int limit=Math.min(individualWinrates.size(),7);
+
+                    for(int i=0;i<limit;i++){
+                        sumOfTopWinrates+=individualWinrates.get(i);
+                        playersCounted++;
+                    }
+
+                    if(playersCounted>0){
+                        double teamWinrate=UtilityClass.getFormattedDouble(sumOfTopWinrates/playersCounted);
+                        if(teamWinrate>0.0){
+                            teams.add(new Interfaces.LeaderboardEntry(null,clanDataMap.get(clanId),teamWinrate));
+                        }
+                    }
+                }
+            }
+
+            teams.sort(Comparator.comparingDouble(team->-team.winrate()));
+            int count=1;
+            for(Interfaces.LeaderboardEntry team:teams){
+                sb.append(count).append(". ").append(team).append("\n");
                 count++;
             }
         }catch(SQLException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
+            uc.log(Level.SEVERE,e.getMessage(),e);
         }
         return sb.toString();
     }
@@ -56,220 +263,244 @@ public class BotActions{
      * @param realm
      * @return
     */
-    public synchronized String getTeamRoster(int clanId,String realm){
-        StringBuilder value=new StringBuilder();
+    public String getTeamRoster(int clanId,String realm){
+        String value="";
         try(Connection cn=new DbConnection().getConnection();
-                PreparedStatement ps=cn.prepareStatement("select t.wotb_id,ud.nickname from team t join user_data ud on t.wotb_id=ud.wotb_id where t.clan_id=? and t.realm=?")){
-            List<Player> players=new ArrayList<>();
-            int count=1;
-            
+                PreparedStatement ps=cn.prepareStatement("SELECT ud.wotb_id, ud.nickname FROM team t JOIN user_data ud ON ud.wotb_id = t.wotb_id WHERE t.clan_id = ? AND t.realm = ?")){
+            Map<Long,String> teamPlayerData=new HashMap<>();
+
             ps.setInt(1,clanId);
             ps.setString(2,realm);
             try(ResultSet rs=ps.executeQuery()){
                 while(rs.next()){
-                    players.add(new Player(rs.getString("nickname"),getThousandBattlesTier10Stats(rs.getInt("wotb_id"))));
+                    long wotbId=rs.getLong("wotb_id");
+                    String nickname=rs.getString("nickname");
+                    teamPlayerData.put(wotbId,nickname);
                 }
             }
-
-            Collections.sort(players,Comparator.comparingDouble(player->-player.winrate));
-            for(Player player:players){
-                value.append(count).append(". ").append(player).append("\n");
-                count++;
-                if(count==8){
-                    value.append("\n");
-                }
-            }
+            value=buildRosterString(teamPlayerData);
         }catch(SQLException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
+            uc.log(Level.SEVERE,e.getMessage(),e);
         }
-        return value.toString();
+        return value;
     }
-    
+
     /**
      * @param clanId
      * @param server
      * @return
      */
-    public synchronized double getTeamWinrate(int clanId,String server){
+    public double getTeamWinrate(int clanId,String server){
+        List<Long> playerIdsInTeam=new ArrayList<>();
         try(Connection cn=new DbConnection().getConnection();
-                PreparedStatement ps=cn.prepareStatement("select wotb_id from team where clan_id=? and realm=?")){
-            List<Double> winrates=new ArrayList<>();
-            int count=0;
-            double value=0.0;
-
-            ps.setInt(1,clanId);
-            ps.setString(2,server);
-            try(ResultSet rs=ps.executeQuery()){
+                PreparedStatement psGetPlayers=cn.prepareStatement("select wotb_id from team where clan_id=? and realm=?")){
+            psGetPlayers.setInt(1,clanId);
+            psGetPlayers.setString(2,server);
+            try(ResultSet rs=psGetPlayers.executeQuery()){
                 while(rs.next()){
-                    winrates.add(getThousandBattlesTier10Stats(rs.getInt("wotb_id")));
+                    playerIdsInTeam.add(rs.getLong("wotb_id"));
                 }
             }
-
-            Collections.sort(winrates,Collections.reverseOrder());
-            for(Double winrate:winrates){
-                if(count==7){
-                    break;
-                }
-                value+=winrate;
-                count++;
-            }
-
-            return value==0?0.0:UtilityClass.getFormattedDouble(value/count);
+            return calculateTeamWinrateFromPlayerIds(playerIdsInTeam);
         }catch(SQLException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
+            uc.log(Level.SEVERE,e.getMessage(),e);
             return 0.0;
         }
     }
-
+    
     /**
-     * @param accId
+     * @param preloadedTier10Data 
+     * @param preloadedLowerTierData 
      * @return
      */
-    protected synchronized double getThousandBattlesTier10Stats(int accId){
-        Mvc3 data=new GetData().getPlayerStats(accId);
-        int battles=data.getBattles();
-        if(battles>=UtilityClass.MAX_BATTLE_COUNT){
-            return UtilityClass.getOverallWinrate(data.getWins(),battles);
+    protected double getThousandBattlesTier10Stats(Mvc3 preloadedTier10Data,Map<Integer,int[]> preloadedLowerTierData){
+        int battlesT10=(preloadedTier10Data!=null)?preloadedTier10Data.getBattles():0;
+        int winsT10=(preloadedTier10Data!=null)?preloadedTier10Data.getWins():0;
+        if(battlesT10>=UtilityClass.MAX_BATTLE_COUNT){
+            return UtilityClass.getOverallWinrate(winsT10,battlesT10);
         }else{
-            return calculatePlayerWeight(accId);
+            return calculatePlayerWeightWithPrefetchedStats(preloadedTier10Data,preloadedLowerTierData);
         }
     }
 
     /**
+     * @param tier10Data 
+     * @param lowerTierBattleData 
+     * @return
+     */
+    public double calculatePlayerWeightWithPrefetchedStats(Mvc3 tier10Data,Map<Integer,int[]> lowerTierBattleData){
+        final int TOURNAMENT_TIER=10;
+        final int REQUIRED_BATTLES=UtilityClass.MAX_BATTLE_COUNT;
+
+        int battlesT10=(tier10Data!=null)?tier10Data.getBattles():0;
+        int winsT10=(tier10Data!=null)?tier10Data.getWins():0;
+
+        if(battlesT10>=REQUIRED_BATTLES){
+            return UtilityClass.getOverallWinrate(winsT10,battlesT10);
+        }
+
+        Map<Integer,int[]> battleData=new HashMap<>();
+        if(lowerTierBattleData!=null){
+            battleData.putAll(lowerTierBattleData);
+        }
+        battleData.put(TOURNAMENT_TIER,new int[]{battlesT10,winsT10});
+
+        return getFormulaStats(battleData);
+    }
+    
+    /**
      * @param accId
      * @return
      */
-    public synchronized double calculatePlayerWeight(int accId){
+    public double calculatePlayerWeight(long accId){
+        final int REQUIRED_BATTLES=UtilityClass.MAX_BATTLE_COUNT;
+        double value=0.0;
         Map<Integer,int[]> battleData=new HashMap<>();
+
         try(Connection cn=new DbConnection().getConnection();
-                PreparedStatement ps=cn.prepareStatement("select sum(tb.battles) as battles, sum(tb.wins) as wins, td.tank_tier from thousand_battles tb join tank_data td on td.tank_id=tb.tank_id where tb.wotb_id=? and td.tank_tier=?")){
-            Mvc3 data=new GetData().getPlayerStats(accId);
-            battleData.put(10,new int[]{data.getBattles(),data.getWins()});
-
-            ps.setInt(1,accId);
-            for(int i=9;i>=5;i--){
-                ps.setInt(2,i);
+                PreparedStatement ps=cn.prepareStatement("select sum(tb.battles) as battles,sum(tb.wins) as wins, td.tank_tier from thousand_battles tb join tank_data td on td.tank_id=tb.tank_id where tb.wotb_id=? and td.tank_tier between 5 and 9 group by td.tank_tier")){
+            Mvc3 data=gd.getPlayerStats(accId);
+            int battles1=data.getBattles();
+            if(battles1<REQUIRED_BATTLES){
+                battleData.put(10,new int[]{battles1,data.getWins()});
+                ps.setLong(1,accId);
                 try(ResultSet rs=ps.executeQuery()){
-                    if(rs.next()){
-                        int dbWins=rs.getInt("wins");
-                        int dbBattles=rs.getInt("battles");
-                        int dbTier=rs.getInt("tank_tier");
-                        battleData.put(dbTier,new int[]{dbBattles,dbWins});
+                    while(rs.next()){
+                        int tier=rs.getInt("tank_tier");
+                        int battles=rs.getInt("battles");
+                        int wins=rs.getInt("wins");
+                        battleData.put(tier,new int[]{battles,wins});
                     }
                 }
+                value=getFormulaStats(battleData);
             }
+        }catch(Exception e){
+            uc.log(Level.SEVERE,e.getMessage(),e);
+        }
+        return value;
+    }
 
-            int minTier=10;
-            int totalBattles=0;
-            int totalWeightedVictories=0;
-            int requiredBattles=UtilityClass.MAX_BATTLE_COUNT;
-            double[] penalty={1.0,0.95,0.85,0.7,0.5,0.25};
-            for(int tier=10;tier>=minTier-5;tier--){
-                int tierOffset=Math.max(minTier-tier,0);
-                if(battleData.containsKey(tier)){
-                    int battles=battleData.get(tier)[0];
-                    int wins=battleData.get(tier)[1];
-                    double winrate=(battles>0)?(double)wins/battles:0.0;
-
-                    if(totalBattles<requiredBattles){
-                        int remainingBattles=requiredBattles-totalBattles;
-                        if(battles<=remainingBattles){
-                            totalWeightedVictories+=penalty[tierOffset]*battles*winrate;
-                            totalBattles+=battles;
-                        }else{
-                            totalWeightedVictories+=penalty[tierOffset]*remainingBattles*winrate;
-                            totalBattles=requiredBattles;
-                        }
-                    }else{
-                        totalWeightedVictories+=penalty[tierOffset]*battles*winrate;
-                        totalBattles+=battles;
-                        break;
-                    }
-                }
-            }
-
-            if(totalBattles<requiredBattles){
-                int remainingBattles=requiredBattles-totalBattles;
-                int lowestTier=battleData.keySet().stream().min(Integer::compare).orElse(10);
-                int[] lowestTierData=battleData.getOrDefault(lowestTier,new int[]{0,0});
-                int lowestTierBattles=lowestTierData[0];
-                int lowestTierWins=lowestTierData[1];
-                double winrate=(lowestTierBattles>0)?(double)lowestTierWins/lowestTierBattles:0.0;
-                double penaltyFactor=penalty[Math.min(Math.max(minTier-lowestTier,0),penalty.length-1)];
-                totalWeightedVictories+=penaltyFactor*remainingBattles*winrate;
-                totalBattles=requiredBattles;
-            }
-
-            return UtilityClass.getOverallWinrate(totalWeightedVictories,totalBattles);
-        }catch(SQLException|ArrayIndexOutOfBoundsException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
+    /**
+     * @param playerIds
+     * @return
+     */
+    private double calculateTeamWinrateFromPlayerIds(List<Long> playerIds){
+        if(playerIds==null||playerIds.isEmpty()){
             return 0.0;
         }
-    }
 
+        Map<Long,Mvc3> batchTier10Stats=gd.getPlayerStatsInBatch(playerIds);
+        Map<Long,Map<Integer,int[]>> batchLowerTierStats=gd.getLowerTierStatsInBatch(playerIds);
+        List<Double> individualWinrates=new ArrayList<>();
+
+        for(Long playerId:playerIds){
+            Mvc3 playerT10Data=batchTier10Stats.getOrDefault(playerId,new Mvc3());
+            Map<Integer,int[]> playerLowerData=batchLowerTierStats.getOrDefault(playerId,Collections.emptyMap());
+            double effectiveWinrate=getThousandBattlesTier10Stats(playerT10Data,playerLowerData);
+            if(effectiveWinrate>0){
+                individualWinrates.add(effectiveWinrate);
+            }
+        }
+
+        if(individualWinrates.isEmpty()){
+            return 0.0;
+        }
+
+        individualWinrates.sort(Collections.reverseOrder());
+
+        double sumOfTopWinrates=0.0;
+        int playersCounted=0;
+        int limit=Math.min(individualWinrates.size(),7);
+
+        for(int i=0;i<limit;i++){
+            sumOfTopWinrates+=individualWinrates.get(i);
+            playersCounted++;
+        }
+
+        return (playersCounted>0)?UtilityClass.getFormattedDouble(sumOfTopWinrates/playersCounted):0.0;
+    }
+    
     /**
-     * @param accId
+     * @param teamPlayerData
      * @return
      */
-    public String checkPlayer(int accId){
-        GetData gd=new GetData();
-        Mvc3 data=gd.getPlayerStats(accId);
-        String val="No data";
-        try(Connection cn=new DbConnection().getConnection();
-                PreparedStatement ps=cn.prepareStatement("select coalesce(t.clan_id,0) as clan_id, ud.nickname, ud.realm as realm from user_data ud left join team t on t.wotb_id=ud.wotb_id where ud.wotb_id=?")){
-            ps.setInt(1,accId);
-            try(ResultSet rs=ps.executeQuery()){
-                if(rs.next()){
-                    double stats=UtilityClass.getOverallWinrate(data.getWins(),data.getBattles());
-                    if(stats!=0.0){
-                        String realm=rs.getString("realm");
-                        int clanId=rs.getInt("clan_id");
-                        if(clanId!=0){
-                            val="("+realm+") - ["+gd.checkClantagByID(clanId,realm)+"] "+rs.getString("nickname")+" ("+stats+"%)";
-                        }else{
-                            val="("+realm+") - [Clanless] "+rs.getString("nickname")+" ("+stats+"%)";
-                        }
-                    }
+    private String buildRosterString(Map<Long,String> teamPlayerData){
+        if(teamPlayerData==null||teamPlayerData.isEmpty()){
+            return "";
+        }
+
+        List<Long> playerIds=new ArrayList<>(teamPlayerData.keySet());
+        Map<Long,Mvc3> batchTier10Stats=gd.getPlayerStatsInBatch(playerIds);
+        Map<Long,Map<Integer,int[]>> batchLowerTierStats=gd.getLowerTierStatsInBatch(playerIds);
+
+        List<Interfaces.Player> players=new ArrayList<>();
+        for(Long playerId:playerIds){
+            String nickname=teamPlayerData.get(playerId);
+            Mvc3 playerT10Data=batchTier10Stats.getOrDefault(playerId,new Mvc3());
+            Map<Integer,int[]> playerLowerData=batchLowerTierStats.getOrDefault(playerId,Collections.emptyMap());
+            double winrate=getThousandBattlesTier10Stats(playerT10Data,playerLowerData);
+            players.add(new Interfaces.Player(nickname,winrate));
+        }
+
+        players.sort(Comparator.comparingDouble(player->-player.winrate()));
+
+        StringBuilder value=new StringBuilder();
+        int count=1;
+        for(Interfaces.Player player:players){
+            value.append(count).append(". ").append(player).append("\n");
+            if(count==7){
+                value.append("\n");
+            }
+            count++;
+        }
+        return value.toString();
+    }
+    
+    /**
+     * @param battleData
+     * @return
+     */
+    private double getFormulaStats(Map<Integer,int[]> battleData){
+        final int TOURNAMENT_TIER=10;
+        final int REQUIRED_BATTLES=UtilityClass.MAX_BATTLE_COUNT;
+        int totalBattles=0;
+        double totalWeightedVictories=0.0;
+        final double[] penalty={1.0,0.95,0.85,0.7,0.5,0.25};
+
+        if(battleData.containsKey(TOURNAMENT_TIER)){
+            int[] stats=battleData.get(TOURNAMENT_TIER);
+            int battles=stats[0];
+            double winRate=battles>0?(double)stats[1]/battles:0;
+
+            int needed=Math.min(battles,REQUIRED_BATTLES-totalBattles);
+            totalWeightedVictories+=needed*winRate;
+            totalBattles+=needed;
+        }
+
+        if(totalBattles<REQUIRED_BATTLES){
+            for(int tier=TOURNAMENT_TIER-1;tier>=5;tier--){
+                if(totalBattles>=REQUIRED_BATTLES)break;
+
+                int tierDifference=TOURNAMENT_TIER-tier;
+                double penaltyFactor=penalty[Math.min(tierDifference,penalty.length-1)];
+
+                if(battleData.containsKey(tier)){
+                    int[] stats=battleData.get(tier);
+                    int battles=stats[0];
+                    double winRate=battles>0?(double)stats[1]/battles:0;
+
+                    int needed=Math.min(battles,REQUIRED_BATTLES-totalBattles);
+                    totalWeightedVictories+=needed*winRate*penaltyFactor;
+                    totalBattles+=needed;
                 }
             }
-        }catch(SQLException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
-        }
-        return val;
-    }
-
-    private class Player{
-        String name;
-        double winrate;
-
-        Player(String name,double winrate){
-            this.name=name;
-            this.winrate=winrate;
         }
 
-        @Override
-        public String toString(){
-            return name+" ("+String.format("%.2f",winrate)+"%)";
+        if(totalBattles<REQUIRED_BATTLES){
+            totalWeightedVictories+=(REQUIRED_BATTLES-totalBattles)*0;
+            totalBattles=REQUIRED_BATTLES;
         }
-    }
-
-    private class Team implements Comparable<Team>{
-        String clantag;
-        double winrate;
-
-        public Team(String clantag,double winrate){
-            this.clantag=clantag;
-            this.winrate=winrate;
-        }
-
-        @Override
-        public int compareTo(Team other){
-            return Double.compare(this.winrate,other.winrate);
-        }
-
-        @Override
-        public String toString(){
-            return clantag+" - "+String.format("%d",Math.round(winrate))+"%";
-        }
+        
+        return UtilityClass.getOverallWinrate(totalWeightedVictories,totalBattles);
     }
 }

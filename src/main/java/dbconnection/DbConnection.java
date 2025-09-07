@@ -8,7 +8,6 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.io.IOException;
 import java.io.FileInputStream;
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.Properties;
 
 import java.util.logging.Level;
@@ -17,6 +16,7 @@ import java.util.logging.Level;
  * @author erick
  */
 public class DbConnection{
+    private static final UtilityClass uc=new UtilityClass();
     protected static HikariDataSource ds;
 
     static{
@@ -34,7 +34,7 @@ public class DbConnection{
             config.setMinimumIdle(5);
             ds=new HikariDataSource(config);
         }catch(IOException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
+            uc.log(Level.SEVERE,e.getMessage(),e);
         }
     }
 
@@ -44,8 +44,8 @@ public class DbConnection{
     public Connection getConnection(){
         try{
             return ds.getConnection();
-        }catch(SQLException|NullPointerException e){
-            new UtilityClass().log(Level.SEVERE,e.getMessage(),e);
+        }catch(Exception e){
+            uc.log(Level.SEVERE,e.getMessage(),e);
             return null;
         }
     }
