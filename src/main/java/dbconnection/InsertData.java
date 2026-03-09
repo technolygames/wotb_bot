@@ -6,6 +6,7 @@ import logic.UtilityClass;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.PreparedStatement;
+import java.sql.Types;
 
 import java.util.logging.Level;
 
@@ -23,7 +24,7 @@ public class InsertData{
      */
     public void setClanInfo(int clanId,String clantag,String realm,long updatedAt){
         try(Connection cn=new DbConnection().getConnection();
-                PreparedStatement ps=cn.prepareStatement("insert into clan_data values(?,?,?,?)")){
+                PreparedStatement ps=cn.prepareStatement("insert ignore into clan_data values(?,?,?,?)")){
             ps.setInt(1,clanId);
             ps.setString(2,clantag);
             ps.setString(3,realm);
@@ -62,7 +63,7 @@ public class InsertData{
      */
     public void registerPlayer(long accId,String nickname,String realm,long lastBattleTime,long updatedAt){
         try(Connection cn=new DbConnection().getConnection();
-                PreparedStatement ps=cn.prepareStatement("insert into user_data values(?,?,?,?,?)")){
+                PreparedStatement ps=cn.prepareStatement("insert ignore into user_data values(?,?,?,?,?)")){
             ps.setLong(1,accId);
             ps.setString(2,nickname);
             ps.setString(3,realm);
@@ -84,9 +85,15 @@ public class InsertData{
      */
     public void ingameTeamDataRegistration(int teamId,int clanId,int tourneyId,String teamName,String realm){
         try(Connection cn=new DbConnection().getConnection();
-                PreparedStatement ps=cn.prepareStatement("insert into ingame_team_data values(?,?,?,?,?)")){
+                PreparedStatement ps=cn.prepareStatement("insert ignore into ingame_team_data values(?,?,?,?,?)")){
             ps.setInt(1,teamId);
-            ps.setInt(2,clanId);
+            
+            if(clanId!=0){
+                ps.setInt(2,clanId);
+            }else{
+                ps.setNull(2,Types.INTEGER);
+            }
+            
             ps.setInt(3,tourneyId);
             ps.setString(4,teamName);
             ps.setString(5,realm);
@@ -102,7 +109,7 @@ public class InsertData{
      */
     public void ingameTeamRegistration(int teamId,long accId){
         try(Connection cn=new DbConnection().getConnection();
-                PreparedStatement ps=cn.prepareStatement("insert into ingame_team values(?,?)")){
+                PreparedStatement ps=cn.prepareStatement("insert ignore into ingame_team values(?,?)")){
             ps.setInt(1,teamId);
             ps.setLong(2,accId);
             ps.executeUpdate();

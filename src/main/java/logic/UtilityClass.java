@@ -1,18 +1,23 @@
 package logic;
 
+import com.google.gson.JsonElement;
 import io.github.cdimascio.dotenv.Dotenv;
-import java.io.BufferedWriter;
-import org.apache.commons.io.FilenameUtils;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.FileInputStream;
 import java.io.FileWriter;
+import java.text.NumberFormat;
+import java.text.ParseException;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Properties;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import java.time.format.DateTimeFormatter;
 import java.util.logging.Level;
@@ -25,42 +30,85 @@ import java.util.logging.SimpleFormatter;
  */
 public class UtilityClass{
     public static final String APP_ID=new UtilityClass().getAppID();
+    public static final int MIN_BATTLE_COUNT=new UtilityClass().getBattleCount("min_count");
     public static final int MAX_BATTLE_COUNT=new UtilityClass().getBattleCount("max_count");
-    private static final Object logFileLock=new Object();
 
     /**
-     * @param file
-     * @return 
+     * Structure:<br>
+     * <ul>
+     * <li>EU</li>
+     * <li>NA</li>
+     * <li>ASIA</li>
+     * </ul>
+     * @return
      */
-    protected String exists(File file){
-        String parent=file.getParent();
-
-        File f=new File(parent);
-        if(!f.exists()){
-            f.mkdirs();
-        }
-
-        String filename=file.getName();
-
-        String name=FilenameUtils.getBaseName(filename);
-        String extension=FilenameUtils.getExtension(filename);
-
-        int i=1;
-        File f2=new File(parent,name+"."+extension);
-        while(f2.exists()){
-            f2=new File(parent,name+"-("+i+")."+extension);
-            i++;
-        }
-
-        return f2.getPath();
+    public static Map<String,List<List<String>>> mapList(){
+        Map<String,List<List<String>>> lists=new HashMap<>();
+        lists.put("EU",new ArrayList<>());
+        lists.put("NA",new ArrayList<>());
+        lists.put("ASIA",new ArrayList<>());
+        return lists;
     }
-
+    
+    public static String getSqlPlaceholders(List<Long> accIds){
+        StringBuilder placeholders=new StringBuilder();
+        for(int i=0;i<accIds.size();i++){
+            placeholders.append("?");
+            if(i<accIds.size()-1){
+                placeholders.append(",");
+            }
+        }
+        return placeholders.toString();
+    }
+    
+    public static boolean isDigit(String str){
+        if(str==null||str.isEmpty())return false;
+        for(int i=0;i<str.length();i++){
+            if(!Character.isDigit(str.charAt(i))){
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    /**
+     * ternary sintaxis for battles<br>
+     * <ul>
+     * <li>value=0 - "0 battles"</li>
+     * <li>value=1 - "1 battle"</li>
+     * <li>value>=2 - "2 battles"</li>
+     * </ul>
+     * @param value
+     * @return
+     */
+    public static String tersin(int value){
+        return value+((value==1)?" battle":" battles");
+    }
+    
+    /**
+     * ternary sintaxis for json values that returns integer value or zero
+     * @param value
+     * @return
+     */
+    public static int tersin(JsonElement value){
+        return (!value.isJsonNull())?value.getAsInt():0;
+    }
+    
+    /**
+     * @param confirmed
+     * @param perGroup 
+     * @return
+     */
+    public static int getMaxGroups(int confirmed,int perGroup){
+        return (int)Math.ceil(UtilityClass.getDivision(confirmed,perGroup));
+    }
+    
     /**
      * @param totalTeams
      * @return 
      */
     public static int calculateTotalPages(int totalTeams){
-        return (int)Math.ceil((double)totalTeams/100);
+        return (int)Math.ceil(getDivision(totalTeams,100));
     }
 
     /**
@@ -68,24 +116,16 @@ public class UtilityClass{
      * @return
      */
     public static double getFormattedDouble(double value){
-        return Math.round(value*100.0)/100.0;
+        return getDivision(Math.round(value*100.0),(int)100.0);
     }
 
     /**
+     * Format: MM/dd/yyyy
      * @param timestamp
      * @return
      */
     public static String getFormattedDate(long timestamp){
-        return LocalDateTime.ofInstant(Instant.ofEpochSecond(timestamp),ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MM/dd/yyyy"));
-    }
-
-    /**
-     * @param fromApi
-     * @param fromDatabase
-     * @return
-     */
-    public static int calculateDifference(int fromApi,int fromDatabase){
-        return fromApi-fromDatabase;
+        return Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MM/dd/yyyy"));
     }
 
     /**
@@ -95,19 +135,19 @@ public class UtilityClass{
      * @return account win rate.
      */
     public static double getOverallWinrate(int wins,int battles){
-        return getFormattedDouble(((double)wins/battles)*100);
+        return getFormattedDouble(getDivision(wins,battles)*100);
     }
     
     /**
-     * Gets account overall win rate.
-     * @param wins
-     * @param battles
-     * @return account win rate.
+     * a/b
+     * @param a dividend
+     * @param b divisor
+     * @return
      */
-    public static double getOverallWinrate(double wins,int battles){
-        return getFormattedDouble((wins/battles)*100);
+    public static double getDivision(double a,int b){
+        return (a/b);
     }
-
+    
     /**
      * @return
      */
@@ -122,7 +162,7 @@ public class UtilityClass{
     public String getRealm(String realm){
         String value=null;
         Properties p=new Properties();
-        try(InputStream is=UtilityClass.class.getResourceAsStream("/realms.properties")){
+        try(InputStream is=getClass().getResourceAsStream("/realms.properties")){
             p.load(is);
             value="https://"+p.getProperty(realm.toUpperCase());
         }catch(IOException e){
@@ -131,6 +171,26 @@ public class UtilityClass{
         return value;
     }
 
+    /**
+     * @param input
+     * @return
+     */
+    public static boolean isValidLocalizedDecimal(String input){
+        if(input==null||input.trim().isEmpty()){
+            return false;
+        }
+
+        NumberFormat formatter=NumberFormat.getInstance();
+        formatter.setGroupingUsed(false);
+        try{
+            formatter.parse(input.trim());
+            return true;
+        }catch(ParseException e){
+            return false;
+        }
+    }
+    
+    
     /**
      * @param count
      * @return
@@ -152,36 +212,37 @@ public class UtilityClass{
      * @return
     */
     public static String parseSeedingType(String description){
-        final String UNKNOWN_SEEDING="Unknown";
-        final String KEYWORD="Seeding principle in each group:";
-
+        String unknownSeeding="Unknown";
+        String seeding="";
+        
+        String[] keywords={
+            "Seeding principle in each group:",
+            "Seeding within groups follows the",
+        };
+        
         if(description==null||description.isEmpty()){
-            return UNKNOWN_SEEDING;
+            return unknownSeeding;
         }
 
-        int keywordIndex=description.indexOf(KEYWORD);
-        if(keywordIndex==-1){
-            return UNKNOWN_SEEDING;
+        String lowerDesc=description.toLowerCase();
+        
+        for(String key:keywords){
+            int keywordIndex=lowerDesc.indexOf(key.toLowerCase());
+            if(keywordIndex!=-1){
+                int valueStartIndex=keywordIndex+key.length();
+                int endOfLineIndex=description.indexOf('\n',valueStartIndex);
+                if(endOfLineIndex==-1){
+                    endOfLineIndex=description.length();
+                }
+                String seedingLine=description.substring(valueStartIndex,endOfLineIndex).trim().toLowerCase();
+                seeding=switch(seedingLine){
+                    case String s when s.contains("strongest")->"Strongest-Weakest";
+                    case String s when s.contains("death")->"Groups of Death";
+                    default->unknownSeeding;
+                };
+            }
         }
-
-        int valueStartIndex=keywordIndex+KEYWORD.length();
-        int endOfLineIndex=description.indexOf('\n',valueStartIndex);
-
-        if(endOfLineIndex==-1){
-            endOfLineIndex=description.length();
-        }
-
-        String seedingValue=description.substring(valueStartIndex,endOfLineIndex).trim();
-
-        String lowerCaseSeedingValue=seedingValue.toLowerCase();
-
-        if(lowerCaseSeedingValue.startsWith("strongest-weakest")){
-            return "Strongest-Weakest";
-        }else if(lowerCaseSeedingValue.startsWith("groups of death")){
-            return "Groups of Death";
-        }else{
-            return UNKNOWN_SEEDING;
-        }
+        return seeding;
     }
 
     /**
@@ -198,32 +259,17 @@ public class UtilityClass{
      * @param message
      * @param thrown
      */
-    public void log(Level level,String message,Throwable thrown){
+    public synchronized void log(Level level,String message,Throwable thrown){
         LogRecord logger2=new LogRecord(level,message);
         logger2.setThrown(thrown);
+        
         String formattedMessage=new SimpleFormatter().format(logger2);
+        
+        String parentDir="data/exceptions/";
+        String baseName=thrown.getClass().getSimpleName();
+        String extension=".log";
 
-        String finalFilePath;
-        synchronized(logFileLock){
-            String parentDir="data/exceptions/";
-            String baseName=thrown.getClass().getSimpleName();
-            String extension=".log";
-
-            File logFile=new File(parentDir,baseName+extension);
-
-            int i=1;
-            while(logFile.exists()){
-                logFile=new File(parentDir,baseName+"-("+i+")"+extension);
-                i++;
-            }
-
-            File parent=logFile.getParentFile();
-            if(parent!=null&&!parent.exists()){
-                parent.mkdirs();
-            }
-
-            finalFilePath=logFile.getAbsolutePath();
-        }
+        String finalFilePath=FileHandler.exists(new File(parentDir,baseName+extension));
 
         try(FileWriter fw=new FileWriter(finalFilePath);
                 BufferedWriter writer=new BufferedWriter(fw)){

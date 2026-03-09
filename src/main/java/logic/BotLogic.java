@@ -4,14 +4,10 @@ import dbconnection.DeleteData;
 import dbconnection.GetData;
 import dbconnection.InsertData;
 import interfaces.Interfaces;
-import mvc.Mvc1;
-import mvc.Mvc2;
 
-import org.jetbrains.annotations.NotNull;
 import io.github.cdimascio.dotenv.Dotenv;
 
 import java.awt.Color;
-import java.time.Instant;
 import java.util.List;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -24,7 +20,6 @@ import java.util.stream.Collectors;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.events.guild.GuildJoinEvent;
 import net.dv8tion.jda.api.events.guild.GuildReadyEvent;
@@ -35,6 +30,7 @@ import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.CommandAutoCompleteInteraction;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
+import net.dv8tion.jda.api.interactions.commands.SlashCommandInteraction;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
@@ -46,15 +42,15 @@ import net.dv8tion.jda.api.sharding.DefaultShardManagerBuilder;
 /**
  * @author erick
  */
-public class BotLogic{
+public class BotLogic implements Runnable{
     ShardManager manager;
+    @Override
     public void run(){
         EventListeners evt=new EventListeners();
         try{
             Dotenv token=Dotenv.configure().directory("data").load();
             DefaultShardManagerBuilder builder=DefaultShardManagerBuilder.createDefault(token.get("TOKEN"));
             builder.setStatus(OnlineStatus.ONLINE);
-            builder.setActivity(Activity.playing("Testing"));
             builder.enableIntents(GatewayIntent.MESSAGE_CONTENT);
             manager=builder.build();
             manager.addEventListener(evt);
@@ -71,18 +67,18 @@ public class BotLogic{
     private final UtilityClass uc=new UtilityClass();
     private final JsonHandler jh=new JsonHandler();
     private final BotCommandActions bca=new BotCommandActions();
-    private final CommandActions ca=new CommandActions();
 
     private static final String MESSAGE="You are not the leader of this team";
     private static final String MESSAGE_2="Cannot be NULL";
     private static final String MESSAGE_3="No data";
     public static final String MESSAGE_4="Something gone wrong";
-    private static final String MESSAGE_5="Results";
-    private static final String MESSAGE_6="Write valid data";
-    private static final String MESSAGE_7="Internal failure";
-    private static final String MESSAGE_8=" has been created!";
+    public static final String MESSAGE_5="Results";
+    public static final String MESSAGE_6="Write valid data";
+    public static final String MESSAGE_7="Internal failure";
+    public static final String MESSAGE_8=" has been created!";
     
     private static final String HEADER_1="add-existing-player";
+    private static final String HEADER_17="calculate-goal-winrate";
     private static final String HEADER_2="check-player";
     private static final String HEADER_3="create-new-team";
     private static final String HEADER_4="formula-stats";
@@ -103,6 +99,9 @@ public class BotLogic{
     private static final String FIELD_HEADER_1_2="clantag";
     private static final String FIELD_HEADER_1_3="server";
     
+    private static final String FIELD_HEADER_17_1="player2";
+    private static final String FIELD_HEADER_17_2="goal-winrate";
+    
     private static final String FIELD_HEADER_2_1="player2";
     
     private static final String FIELD_HEADER_3_1="clantag3";
@@ -110,15 +109,13 @@ public class BotLogic{
     private static final String FIELD_HEADER_3_3="player3";
     
     private static final String FIELD_HEADER_4_1="player4";
+    private static final String FIELD_HEADER_4_2="battle-count";
     
     private static final String FIELD_HEADER_5_1="clantag5";
-    private static final String FIELD_HEADER_5_2="server5";
     
     private static final String FIELD_HEADER_16_1="clantag16";
-    private static final String FIELD_HEADER_16_2="realm16";
     
     private static final String FIELD_HEADER_7_1="tourney_id";
-    private static final String FIELD_HEADER_7_2="server7";
     
     private static final String FIELD_HEADER_8_1="player8";
     
@@ -127,14 +124,11 @@ public class BotLogic{
     
     private static final String FIELD_HEADER_10_1="nickname10";
     private static final String FIELD_HEADER_10_2="clantag10";
-    private static final String FIELD_HEADER_10_3="server10";
     
     private static final String FIELD_HEADER_11_1="clantag11";
-    private static final String FIELD_HEADER_11_2="server11";
     
     private static final String FIELD_HEADER_12_1="tourney_id";
-    private static final String FIELD_HEADER_12_2="server12";
-    
+
     private static final String FIELD_HEADER_13_1="server13";
     
     private static final String FIELD_HEADER_14_1="clantag14";
@@ -151,61 +145,30 @@ public class BotLogic{
     private static final String FIELD_HEADER_14_12="player10";
     
     private static final String FIELD_HEADER_15_1="clantag15";
-    private static final String FIELD_HEADER_15_2="server15";
     
     private class EventListeners extends net.dv8tion.jda.api.hooks.ListenerAdapter{
         @Override
-        public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent evt){
-            CommandMethods cm=new CommandMethods(evt,evt.getUser().getId());
+        public void onSlashCommandInteraction(SlashCommandInteractionEvent evt){
+            CommandMethods cm=new CommandMethods(evt);
+            String callerId=evt.getUser().getId();
             switch(evt.getName()){
-                case HEADER_1->{
-                    cm.addExistingPlayer();
-                }
-                case HEADER_2->{
-                    cm.checkPlayer();
-                }
-                case HEADER_3->{
-                    cm.createNewTeam();
-                }
-                case HEADER_4->{
-                    cm.formulaStats();
-                }
-                case HEADER_5->{
-                    cm.freeupRoster();
-                }
-                case HEADER_6->{
-                    cm.help();
-                }
-                case HEADER_16->{
-                    cm.ingameRoster();
-                }
-                case HEADER_7->{
-                    cm.ingameTeamLeaderboard();
-                }
-                case HEADER_8->{
-                    cm.personalStatsTier10();
-                }
-                case HEADER_9->{
-                    cm.registerPlayer();
-                }
-                case HEADER_10->{
-                    cm.removeFromRoster();
-                }
-                case HEADER_11->{
-                    cm.rosterCommand();
-                }
-                case HEADER_12->{
-                    cm.seedTeams();
-                }
-                case HEADER_13->{
-                    cm.teamLeaderboard();
-                }
-                case HEADER_14->{
-                    cm.teamRegistrationCommand();
-                }
-                case HEADER_15->{
-                    cm.teamStatsCommand();
-                }
+                case HEADER_1->cm.addExistingPlayer(callerId);
+                case HEADER_17->cm.calculateGoalWinrate();
+                case HEADER_2->cm.checkPlayer();
+                case HEADER_3->cm.createNewTeam(callerId);
+                case HEADER_4->cm.formulaStats();
+                case HEADER_5->cm.freeupRoster(callerId);
+                case HEADER_6->cm.help();
+                case HEADER_16->cm.ingameRoster();
+                case HEADER_7->cm.ingameTeamLeaderboard();
+                case HEADER_8->cm.personalStatsTier10();
+                case HEADER_9->cm.registerPlayer();
+                case HEADER_10->cm.removeFromRoster(callerId);
+                case HEADER_11->cm.rosterCommand();
+                case HEADER_12->cm.seedTeams();
+                case HEADER_13->cm.teamLeaderboard();
+                case HEADER_14->cm.teamRegistrationCommand(callerId);
+                case HEADER_15->cm.teamStatsCommand();
                 default->{}
             }
         }
@@ -215,69 +178,66 @@ public class BotLogic{
             switch(evt.getName()){
                 case HEADER_1->{
                     switch(evt.getFocusedOption().getName()){
-                        case FIELD_HEADER_1_1->{
-                            setChoices(evt,Concurrency.clanlessPlayerChoices);
-                        }
-                        case FIELD_HEADER_1_2->{
-                            setChoices(evt,Concurrency.clanChoices);
-                        }
+                        case FIELD_HEADER_1_1->setChoices(evt,BotCommandActions.playerChoices);
+                        case FIELD_HEADER_1_2->setChoices(evt,BotCommandActions.clanChoices);
                         default->{}
+                    }
+                }
+                case HEADER_17->{
+                    if(evt.getFocusedOption().getName().equals(FIELD_HEADER_17_1)){
+                        setChoices(evt,BotCommandActions.playerChoices);
                     }
                 }
                 case HEADER_2->{
                     if(evt.getFocusedOption().getName().equals(FIELD_HEADER_2_1)){
-                        setChoices(evt,Concurrency.playerChoices);
+                        setChoices(evt,BotCommandActions.playerChoices);
                     }
                 }
                 case HEADER_4->{
                     if(evt.getFocusedOption().getName().equals(FIELD_HEADER_4_1)){
-                        setChoices(evt,Concurrency.tbPlayerChoices);
+                        setChoices(evt,BotCommandActions.tbPlayerChoices);
                     }
                 }
                 case HEADER_5->{
                     if(evt.getFocusedOption().getName().equals(FIELD_HEADER_5_1)){
-                        setChoices(evt,Concurrency.clanChoices);
+                        setChoices(evt,BotCommandActions.clanChoices);
                     }
                 }
                 case HEADER_16->{
                     if(evt.getFocusedOption().getName().equals(FIELD_HEADER_16_1)){
-                        setChoices(evt,Concurrency.ingameTeamChoices);
+                        setChoices(evt,BotCommandActions.ingameTeamChoices);
                     }
                 }
                 case HEADER_7->{
                     if(evt.getFocusedOption().getName().equals(FIELD_HEADER_7_1)){
-                        setChoices(evt,Concurrency.tournamentChoices);
+                        setChoices(evt,BotCommandActions.tournamentChoices);
                     }
                 }
                 case HEADER_8->{
                     if(evt.getFocusedOption().getName().equals(FIELD_HEADER_8_1)){
-                        setChoices(evt,Concurrency.playerChoices);
+                        setChoices(evt,BotCommandActions.playerChoices);
                     }
                 }
                 case HEADER_10->{
                     switch(evt.getFocusedOption().getName()){
-                        case FIELD_HEADER_10_1->{
-                            setChoices(evt,Concurrency.notNullPlayerChoices);
-                        }
-                        case FIELD_HEADER_10_2->{
-                            setChoices(evt,Concurrency.clanChoices);
-                        }
+                        case FIELD_HEADER_10_1->setChoices(evt,BotCommandActions.notNullPlayerChoices);
+                        case FIELD_HEADER_10_2->setChoices(evt,BotCommandActions.clanChoices);
                         default->{}
                     }
                 }
                 case HEADER_11->{
                     if(evt.getFocusedOption().getName().equals(FIELD_HEADER_11_1)){
-                        setChoices(evt,Concurrency.clanChoices);
+                        setChoices(evt,BotCommandActions.clanChoices);
                     }
                 }
                 case HEADER_12->{
                     if(evt.getFocusedOption().getName().equals(FIELD_HEADER_12_1)){
-                        setChoices(evt,Concurrency.tournamentChoices);
+                        setChoices(evt,BotCommandActions.tournamentChoices);
                     }
                 }
                 case HEADER_15->{
                     if(evt.getFocusedOption().getName().equals(FIELD_HEADER_15_1)){
-                        setChoices(evt,Concurrency.clanChoices);
+                        setChoices(evt,BotCommandActions.clanChoices);
                     }
                 }
                 default->{}
@@ -285,19 +245,15 @@ public class BotLogic{
         }
 
         @Override
-        public void onButtonInteraction(@NotNull ButtonInteractionEvent evt){
+        public void onButtonInteraction(ButtonInteractionEvent evt){
             evt.deferEdit().queue(hook->{
                 try{
                     String value=evt.getButton().getId().trim();
                     String[] val=value.split(":");
                     switch(val[0]){
-                        case "refresh-formula-stats"->{
-                            hook.editOriginalEmbeds(ca.playerWeight(Integer.parseInt(val[1]))).queue();
-                        }
-                        case "refresh-personal-stats"->{
-                            hook.editOriginalEmbeds(bca.getTier10Stats(Integer.parseInt(val[1]))).queue();
-                        }
-                        default->{}
+                        case "refresh-formula-stats"->hook.editOriginalEmbeds(bca.playerWeight(Integer.parseInt(val[1]),Integer.parseInt(val[2]))).queue();
+                        case "refresh-personal-stats"->hook.editOriginalEmbeds(bca.getTier10Stats(Integer.parseInt(val[1]))).queue();
+                        default->hook.sendMessage("This action is no longer supported.").setEphemeral(true).queue();
                     }
                 }catch(Exception e){
                     hook.editOriginalEmbeds(new EmbedBuilder().setColor(Color.RED).addField(MESSAGE_4,MESSAGE_7,true).build()).queue();
@@ -308,11 +264,15 @@ public class BotLogic{
 
         private void setChoices(CommandAutoCompleteInteraction evt,List<Command.Choice> choices){
             String focused=evt.getFocusedOption().getValue().toLowerCase();
-            List<Command.Choice> choices2=choices.stream()
+            List<Command.Choice> filteredChoices=choices.stream()
                     .filter(choice->choice.getName().toLowerCase().startsWith(focused))
-                    .limit(5)
                     .collect(Collectors.toList());
-            Collections.shuffle(choices2);
+
+            Collections.shuffle(filteredChoices); 
+
+            List<Command.Choice> choices2=filteredChoices.stream()
+                    .limit(5)
+                    .toList();
             evt.replyChoices(choices2).queue();
         }
 
@@ -336,13 +296,13 @@ public class BotLogic{
         }
 
         @Override
-        public void onGuildJoin(@NotNull GuildJoinEvent evt){
+        public void onGuildJoin(GuildJoinEvent evt){
             registerCommands(evt.getGuild());
             //uc.log(Level.INFO,evt.getGuild().getName());
         }
 
         @Override
-        public void onGuildReady(@NotNull GuildReadyEvent evt){
+        public void onGuildReady(GuildReadyEvent evt){
             registerCommands(evt.getGuild());
             //uc.log(Level.INFO,evt.getGuild().getName());
         }
@@ -355,6 +315,11 @@ public class BotLogic{
                     new Command.Choice("EU","EU"),
                     new Command.Choice("ASIA","ASIA")
             );
+            
+            List<Command.Choice> battleCount=Arrays.asList(
+                    new Command.Choice("2000","2000"),
+                    new Command.Choice("2500","2500")
+            );
 
             commands.add(Commands.slash(HEADER_1,"Adds a clanless player to a team roster.")
                     .addOptions(
@@ -363,6 +328,12 @@ public class BotLogic{
                             new OptionData(OptionType.STRING,FIELD_HEADER_1_3,"Player and team region",true).addChoices(serverChoices)
                     ));
 
+            commands.add(Commands.slash(HEADER_17,"Calculates required battles to play based on a target win rate.")
+                    .addOptions(
+                            new OptionData(OptionType.STRING,FIELD_HEADER_17_1,"Player",true).setAutoComplete(true),
+                            new OptionData(OptionType.STRING,FIELD_HEADER_17_2,"Target winrate (expected form: 00.00)",true)
+                    ));
+            
             commands.add(Commands.slash(HEADER_2,"Checks a specific player in the bot's registry.")
                     .addOptions(
                             new OptionData(OptionType.STRING,FIELD_HEADER_2_1,"Player to be checked",true).setAutoComplete(true)
@@ -375,27 +346,27 @@ public class BotLogic{
                             new OptionData(OptionType.STRING,FIELD_HEADER_3_3,"Player nickname",true)
                     ));
 
-            commands.add(Commands.slash(HEADER_4,"Provides an approximate value of the seeding; not definitive and may vary.")
+            commands.add(Commands.slash(HEADER_4,"Provides an approximate value of the seeding winrate; not definitive value and may vary.")
                     .addOptions(
-                            new OptionData(OptionType.STRING,FIELD_HEADER_4_1,"Player",true).setAutoComplete(true)
+                            new OptionData(OptionType.STRING,FIELD_HEADER_4_1,"Player",true).setAutoComplete(true),
+                            new OptionData(OptionType.STRING,FIELD_HEADER_4_2,"Battle count",true).addChoices(battleCount)
                     ));
 
             commands.add(Commands.slash(HEADER_5,"Clears a team roster but keeps player entries for stat tracking.")
                     .addOptions(
-                            new OptionData(OptionType.STRING,FIELD_HEADER_5_1,"Team clantag",true).setAutoComplete(true),
-                            new OptionData(OptionType.STRING,FIELD_HEADER_5_2,"Team region",true).addChoices(serverChoices)
+                            new OptionData(OptionType.STRING,FIELD_HEADER_5_1,"Team clantag",true).setAutoComplete(true)
                     ));
 
             commands.add(Commands.slash(HEADER_6,"yes"));
             
             commands.add(Commands.slash(HEADER_16,"(Still under development, only testing purpose)")
-                    .addOptions(new OptionData(OptionType.STRING,FIELD_HEADER_16_1,"Team clantag",true).setAutoComplete(true),
-                            new OptionData(OptionType.STRING,FIELD_HEADER_16_2,"Team region",true).addChoices(serverChoices)));
+                    .addOptions(
+                            new OptionData(OptionType.STRING,FIELD_HEADER_16_1,"Team clantag",true).setAutoComplete(true)
+                    ));
             
             commands.add(Commands.slash(HEADER_7,"(Still under development, only testing purpose)")
                     .addOptions(
-                            new OptionData(OptionType.STRING,FIELD_HEADER_7_1,"Tournament ID",true).setAutoComplete(true),
-                            new OptionData(OptionType.STRING,FIELD_HEADER_7_2,"Teams region",true).addChoices(serverChoices)
+                            new OptionData(OptionType.STRING,FIELD_HEADER_7_1,"Tournament ID",true).setAutoComplete(true)
                     ));
 
             commands.add(Commands.slash(HEADER_8,"Gets a player's tier 10 statistics.")
@@ -403,7 +374,7 @@ public class BotLogic{
                             new OptionData(OptionType.STRING,FIELD_HEADER_8_1,"Player nickname",true).setAutoComplete(true)
                     ));
 
-            commands.add(Commands.slash(HEADER_9,"Registers a clanless player.")
+            commands.add(Commands.slash(HEADER_9,"Register a player.")
                     .addOptions(
                             new OptionData(OptionType.STRING,FIELD_HEADER_9_1,"Player nickname",true),
                             new OptionData(OptionType.STRING,FIELD_HEADER_9_2,"Team region",true).addChoices(serverChoices)
@@ -412,20 +383,17 @@ public class BotLogic{
             commands.add(Commands.slash(HEADER_10,"Removes a player from a team roster.")
                     .addOptions(
                             new OptionData(OptionType.STRING,FIELD_HEADER_10_1,"Player nickname",true).setAutoComplete(true),
-                            new OptionData(OptionType.STRING,FIELD_HEADER_10_2,"Team clantag",true).setAutoComplete(true),
-                            new OptionData(OptionType.STRING,FIELD_HEADER_10_3,"Team region",true).addChoices(serverChoices)
+                            new OptionData(OptionType.STRING,FIELD_HEADER_10_2,"Team clantag",true).setAutoComplete(true)
                     ));
             
             commands.add(Commands.slash(HEADER_11,"Displays the team structure.")
                     .addOptions(
-                            new OptionData(OptionType.STRING,FIELD_HEADER_11_1,"Team clantag",true).setAutoComplete(true),
-                            new OptionData(OptionType.STRING,FIELD_HEADER_11_2,"Team region",true).addChoices(serverChoices)
+                            new OptionData(OptionType.STRING,FIELD_HEADER_11_1,"Team clantag",true).setAutoComplete(true)
                     ));
 
             commands.add(Commands.slash(HEADER_12,"(Still under development, only testing purpose)")
                     .addOptions(
-                            new OptionData(OptionType.STRING,FIELD_HEADER_12_1,"Tournament ID",true).setAutoComplete(true),
-                            new OptionData(OptionType.STRING,FIELD_HEADER_12_2,"Teams region",true).addChoices(serverChoices)
+                            new OptionData(OptionType.STRING,FIELD_HEADER_12_1,"Tournament ID",true).setAutoComplete(true)
                     ));
 
             commands.add(Commands.slash(HEADER_13,"Shows teams registered in the bot's records.")
@@ -449,34 +417,32 @@ public class BotLogic{
                             new OptionData(OptionType.STRING,FIELD_HEADER_14_12,"10th player of the team",false)
                     ));
 
-            commands.add(Commands.slash(HEADER_15,"Gets a team's statistics.")
+            commands.add(Commands.slash(HEADER_15,"Gets a team's stats.")
                     .addOptions(
-                            new OptionData(OptionType.STRING,FIELD_HEADER_15_1,"Team clantag",true).setAutoComplete(true),
-                            new OptionData(OptionType.STRING,FIELD_HEADER_15_2,"Team region",true).addChoices(serverChoices)
+                            new OptionData(OptionType.STRING,FIELD_HEADER_15_1,"Team clantag",true).setAutoComplete(true)
                     ));
+
             guild.updateCommands().addCommands(commands).queue();
         }
     }
     
     protected class CommandMethods{
-        String callerId;
-        SlashCommandInteractionEvent evt;
-        public CommandMethods(@NotNull SlashCommandInteractionEvent evt,String userId){
+        SlashCommandInteraction evt;
+        public CommandMethods(SlashCommandInteraction evt){
             this.evt=evt;
-            this.callerId=userId;
         }
 
-        private void addExistingPlayer(){
+        private void addExistingPlayer(String callerId){
             EmbedBuilder eb=new EmbedBuilder();
             evt.deferReply(false).queue(hook->{
                 try{
-                    int clantag=evt.getOption(FIELD_HEADER_1_2).getAsInt();
                     long player=evt.getOption(FIELD_HEADER_1_1).getAsLong();
+                    int clantag=evt.getOption(FIELD_HEADER_1_2).getAsInt();
                     String realm=evt.getOption(FIELD_HEADER_1_3).getAsString().toUpperCase();
 
-                    if(gd.checkCallerDiscordId(callerId,clantag,realm)){
+                    if(gd.checkCallerDiscordId(callerId,clantag)){
                         id.teamRegistration(clantag,player,callerId,realm);
-                        eb.setColor(Color.GREEN).addField(MESSAGE_5,gd.checkPlayerByID(player)+" has been added to "+gd.checkClantagByID(clantag,realm)+" roster",false);
+                        eb.setColor(Color.GREEN).addField(MESSAGE_5,gd.checkPlayerByID(player)+" has been added to "+gd.checkClantagByID(clantag)+" roster",false);
                     }else{
                         eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE,false);
                     }
@@ -488,6 +454,20 @@ public class BotLogic{
             });
         }
 
+        private void calculateGoalWinrate(){
+            EmbedBuilder eb=new EmbedBuilder();
+            evt.deferReply(false).queue(hook->{
+                try{
+                    long player=evt.getOption(FIELD_HEADER_17_1).getAsLong();
+                    double goal=evt.getOption(FIELD_HEADER_17_2).getAsDouble();
+                    hook.sendMessageEmbeds(bca.getOverallGoalAccWinrate(player,goal)).queue();
+                }catch(Exception e){
+                    hook.sendMessageEmbeds(eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE_6+" or register first your account using register-player command",false).build()).queue();
+                    uc.log(Level.SEVERE,e.getMessage(),e);
+                }
+            });
+        }
+        
         private void checkPlayer(){
             EmbedBuilder eb=new EmbedBuilder();
             evt.deferReply(false).queue(hook->{
@@ -501,7 +481,7 @@ public class BotLogic{
             });
         }
 
-        private void createNewTeam(){
+        private void createNewTeam(String callerId){
             EmbedBuilder eb=new EmbedBuilder();
             evt.deferReply(false).queue(hook->{
                 MessageEmbed me=null;
@@ -510,8 +490,8 @@ public class BotLogic{
                     String player=evt.getOption(FIELD_HEADER_3_3).getAsString().trim();
                     String realm=evt.getOption(FIELD_HEADER_3_2).getAsString().toUpperCase();
                     if(clantag!=null&&!clantag.isEmpty()&&!clantag.equalsIgnoreCase("NULL")){
-                        Mvc1 data=bca.checkDiscordInput(player,realm);
-                        me=ca.createTeam(data,jh.getClanData(clantag,realm),callerId);
+                        Interfaces.UserData2 data=bca.checkDiscordInput(player,realm);
+                        me=bca.createTeam(data,jh.getClanData(clantag,realm),callerId);
                     }else{
                         me=eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE_2,false).build();
                     }
@@ -528,7 +508,8 @@ public class BotLogic{
             evt.deferReply(false).queue(hook->{
                 try{
                     long player=evt.getOption(FIELD_HEADER_4_1).getAsLong();
-                    hook.sendMessageEmbeds(ca.playerWeight(player)).addActionRow(Button.primary("refresh-formula-stats:"+player,"Refresh")).queue();
+                    int requiredBattles=evt.getOption(FIELD_HEADER_4_2).getAsInt();
+                    hook.sendMessageEmbeds(bca.playerWeight(player,requiredBattles)).addActionRow(Button.primary("refresh-formula-stats:"+player+":"+requiredBattles,"Refresh")).queue();
                 }catch(Exception e){
                     hook.sendMessageEmbeds(eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE_6+" or register first your account for stat tracking using register-player command",false).build()).queue();
                     uc.log(Level.SEVERE,e.getMessage(),e);
@@ -536,15 +517,14 @@ public class BotLogic{
             });
         }
 
-        private void freeupRoster(){
+        private void freeupRoster(String callerId){
             EmbedBuilder eb=new EmbedBuilder();
             evt.deferReply(false).queue(hook->{
                 try{
                     int clantag=evt.getOption(FIELD_HEADER_5_1).getAsInt();
-                    String realm=evt.getOption(FIELD_HEADER_5_2).getAsString();
-                    if(gd.checkCallerDiscordId(callerId,clantag,realm)){
-                        dd.freeupRoster(clantag,realm);
-                        eb.setColor(Color.GREEN).addField(MESSAGE_5,gd.checkClantagByID(clantag,realm)+" roster has been removed from team list", false);
+                    if(gd.checkCallerDiscordId(callerId,clantag)){
+                        dd.freeupRoster(clantag);
+                        eb.setColor(Color.GREEN).addField(MESSAGE_5,gd.checkClantagByID(clantag)+" roster has been removed from team list", false);
                     }else{
                         eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE,false);
                     }
@@ -560,7 +540,7 @@ public class BotLogic{
             EmbedBuilder eb=new EmbedBuilder();
             evt.deferReply(false).queue(hook->{
                 eb.setColor(Color.PINK);
-                for(Map.Entry<String,String> entry:jh.getHelpCommandData().entrySet()){
+                for(Map.Entry<String,String> entry:new FileHandler().getHelpCommandData().entrySet()){
                     eb.addField(entry.getKey(),entry.getValue(),false);
                 }
                 hook.sendMessageEmbeds(eb.build()).queue();
@@ -572,10 +552,9 @@ public class BotLogic{
             evt.deferReply(false).queue(hook->{
                 try{
                     int clanId=evt.getOption(FIELD_HEADER_16_1).getAsInt();
-                    String realm=evt.getOption(FIELD_HEADER_16_2).getAsString().toUpperCase();
                     if(clanId!=0){
                         double team=ba.getIngameTeamWinrate(clanId);
-                        String team2=ba.getIngameTeamRoster(clanId,realm);
+                        String team2=ba.getIngameTeamRoster(clanId);
                         if(!team2.isEmpty()){
                             eb.setColor(Color.GREEN)
                                     .addField("Original:",team+"%",false)
@@ -600,43 +579,11 @@ public class BotLogic{
             evt.deferReply(false).queue(hook->{
                 try{
                     int tourneyId=evt.getOption(FIELD_HEADER_7_1).getAsInt();
-                    String realm=evt.getOption(FIELD_HEADER_7_2).getAsString().toUpperCase();
-
-                    List<Interfaces.LeaderboardEntry> teams=ba.getIngameLeaderboardData(tourneyId,realm);
-
-                    eb.setTitle(MESSAGE_5).setColor(Color.GREEN);
-
-                    if(teams.isEmpty()){
-                        eb.setDescription("No teams were found with registered battles for this tournament.");
-                    }else{
-                        StringBuilder fieldValue=new StringBuilder();
-                        int fieldCount=1;
-                        int rank=1;
-
-                        for(Interfaces.LeaderboardEntry team:teams){
-                            String line=String.format("%d. %s\n",rank,team.toString());
-
-                            if(fieldValue.length()+line.length()>1024){
-                                eb.addField("Position from "+(rank-fieldValue.toString().lines().count())+" to "+(rank-1),fieldValue.toString(),false);
-                                fieldValue.setLength(0);
-                                fieldCount++;
-                            }
-
-                            if(fieldCount>25)break;
-
-                            fieldValue.append(line);
-                            rank++;
-                        }
-
-                        if(fieldValue.length()>0){
-                            eb.addField("Position from "+(rank-fieldValue.toString().lines().count())+" to "+(rank-1),fieldValue.toString(),false);
-                        }
-                    }
+                    hook.sendMessageEmbeds(bca.teamLeaderboard(gd.getIngameLeaderboardData(tourneyId))).queue();
                 }catch(Exception e){
-                    eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE_6,false);
+                    hook.sendMessageEmbeds(eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE_6,false).build()).queue();
                     uc.log(Level.SEVERE,e.getMessage(),e);
                 }
-                hook.sendMessageEmbeds(eb.build()).queue();
             });
         }
 
@@ -659,13 +606,13 @@ public class BotLogic{
                 try{
                     String player=evt.getOption(FIELD_HEADER_9_1).getAsString().trim();
                     String realm=evt.getOption(FIELD_HEADER_9_2).getAsString().toUpperCase();
-                    Mvc1 data=bca.checkDiscordInput(player,realm);
+                    Interfaces.UserData2 data=bca.checkDiscordInput(player,realm);
 
-                    long accId=data.getAcoountId();
-                    String nickname=data.getNickname();
+                    long accId=data.accId();
+                    String nickname=data.nickname();
                     if(accId!=0){
-                        if(!gd.checkUserData(accId,realm)){
-                            id.registerPlayer(accId,nickname,realm,data.getLastBattleTime(),data.getUpdatedAt());
+                        if(!gd.checkUserData(accId)){
+                            id.registerPlayer(accId,nickname,realm,data.lastBattleTime(),data.updatedAt());
                             eb.setColor(Color.GREEN).addField(MESSAGE_5,nickname+" has been registered successfully!",false);
                         }else{
                             eb.setColor(Color.YELLOW).addField(MESSAGE_4,nickname+" is already registered",false);
@@ -681,14 +628,13 @@ public class BotLogic{
             });
         }
 
-        private void removeFromRoster(){
+        private void removeFromRoster(String callerId){
             EmbedBuilder eb=new EmbedBuilder();
             evt.deferReply(false).queue(hook->{
                 try{
                     long player=evt.getOption(FIELD_HEADER_10_1).getAsLong();
                     int clantag=evt.getOption(FIELD_HEADER_10_2).getAsInt();
-                    String realm=evt.getOption(FIELD_HEADER_10_3).getAsString();
-                    if(gd.checkCallerDiscordId(callerId,clantag,realm)){
+                    if(gd.checkCallerDiscordId(callerId,clantag)){
                         dd.removeFromRoster(player,clantag);
                         eb.setColor(Color.GREEN).addField(MESSAGE_5,gd.checkPlayerByID(player)+" has been removed from the team roster",false);
                     }else{
@@ -707,16 +653,13 @@ public class BotLogic{
             evt.deferReply(false).queue(hook->{
                 try{
                     int clanId=evt.getOption(FIELD_HEADER_11_1).getAsInt();
-                    String realm=evt.getOption(FIELD_HEADER_11_2).getAsString().toUpperCase();
                     if(clanId!=0){
-                        double team=ba.getTeamWinrate(clanId,realm);
-                        String team2=ba.getTeamRoster(clanId,realm);
-
-                        if(!team2.isEmpty()){
+                        Interfaces.TeamProfile profile=ba.getTeamProfile(clanId);
+                        if(profile!=null&&!profile.roster().isEmpty()){
                             eb.setColor(Color.GREEN)
-                                    .addField("Original:",team+"%",false)
-                                    .addField("Wargaming's page:",Math.round(team)+"%",false)
-                                    .addField("Roster:",team2,false);
+                                    .addField("Original:",profile.winrate()+"%",false)
+                                    .addField("Wargaming's page:",Math.round(profile.winrate())+"%",false)
+                                    .addField("Roster:",profile.roster(),false);
                         }else{
                             eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE_3,false);
                         }
@@ -735,13 +678,12 @@ public class BotLogic{
             EmbedBuilder eb=new EmbedBuilder();
             evt.deferReply().queue(hook->{
                 int tourneyId=evt.getOption(FIELD_HEADER_12_1).getAsInt();
-                String realm=evt.getOption(FIELD_HEADER_12_2).getAsString();
                 try{
-                    List<MessageEmbed> embeds=bca.seedTeams(tourneyId,realm);
+                    List<MessageEmbed> embeds=bca.seedTeams(tourneyId);
                     if(!embeds.isEmpty()){
                         hook.sendMessageEmbeds(embeds).queue();
                     }else{
-                        hook.sendMessage("No se pudo generar ningún grupo.").queue();
+                        hook.sendMessage("No group could be generated.").queue();
                     }
                 }catch(Exception e){
                     uc.log(Level.SEVERE,e.getMessage(),e);
@@ -755,18 +697,20 @@ public class BotLogic{
             evt.deferReply(false).queue(hook->{
                 try{
                     String realm=evt.getOption(FIELD_HEADER_13_1).getAsString().toUpperCase();
-                    eb.setColor(Color.GREEN).addField(MESSAGE_5,ba.teamLeaderboard(realm),false);
+                    hook.sendMessageEmbeds(bca.teamLeaderboard(gd.teamLeaderboard(realm))).queue();
                 }catch(Exception e){
-                    eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE_6,false);
+                    hook.sendMessageEmbeds(eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE_6,false).build()).queue();
                     uc.log(Level.SEVERE,e.getMessage(),e);
                 }
-                hook.sendMessageEmbeds(eb.build()).queue();
             });
         }
 
-        private void teamRegistrationCommand(){
+        private void teamRegistrationCommand(String callerId){
             EmbedBuilder eb=new EmbedBuilder();
+            StringBuilder successLog=new StringBuilder();
+            StringBuilder errorLog=new StringBuilder();
             evt.deferReply(false).queue(hook->{
+                int successCount=0;
                 try{
                     OptionMapping[] values={
                         evt.getOption(FIELD_HEADER_14_3),
@@ -783,20 +727,46 @@ public class BotLogic{
                     String clantag=evt.getOption(FIELD_HEADER_14_1).getAsString().toUpperCase();
                     String realm=evt.getOption(FIELD_HEADER_14_2).getAsString().toUpperCase();
                     if(clantag!=null&&!clantag.isEmpty()&&!clantag.equalsIgnoreCase("NULL")){
+                        Interfaces.ClanData2 data2=jh.getClanData(clantag,realm);
                         for(OptionMapping value:values){
                             if(value!=null){
-                                Mvc1 data=bca.checkDiscordInput(value.getAsString(),realm);
-                                Mvc2 data2=jh.getClanData(clantag,realm);
-                                MessageEmbed singleResult=ca.createTeam(data,data2,callerId);
-                                if(singleResult!=null&&!singleResult.getFields().isEmpty()){
-                                    for(MessageEmbed.Field field:singleResult.getFields()){
-                                        eb.setColor(Color.GREEN).addField(field);
-                                    }
+                                Interfaces.UserData2 data=bca.checkDiscordInput(value.getAsString(),realm);
+                                MessageEmbed resultMessage=bca.createTeam(data,data2,callerId);
+                                
+                                Color embedColor=resultMessage.getColor();
+                                List<MessageEmbed.Field> field=resultMessage.getFields();
+                                
+                                String statusMessage;
+                                if(embedColor.equals(Color.GREEN)){
+                                    statusMessage=field.stream().
+                                            filter(f->MESSAGE_5.equals(f.getName())).
+                                            findFirst().map(MessageEmbed.Field::getValue).
+                                            orElse("Player added successfully.");
+                                    
+                                    successLog.append(statusMessage).append("\n");
+                                    successCount++;
+                                }else if(embedColor.equals(Color.RED)||embedColor.equals(Color.YELLOW)){
+                                    statusMessage=field.stream().
+                                            filter(f->MESSAGE_4.equals(f.getName())).
+                                            findFirst().
+                                            map(MessageEmbed.Field::getValue).
+                                            orElse("Error or warning occurred.");
+
+                                    errorLog.append("• ").append(statusMessage).append("\n");
                                 }
                             }
                         }
+                        eb.setTitle("Team registration process: "+clantag);
+                        eb.setColor(successCount>0?Color.GREEN:Color.RED);
+
+                        if(successLog.length()>0){
+                            eb.addField("Players registered successfully ("+successCount+")",successLog.toString(),false);
+                        }
+                        if(errorLog.length()>0){
+                            eb.addField("Players with errors/warnings",errorLog.toString(),false);
+                        }
                     }else{
-                        eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE_2,false);
+                        eb.setColor(Color.YELLOW).addField(MESSAGE_4,"Clantag cannot be empty or null.",false);
                     }
                 }catch(Exception e){
                     eb.setColor(Color.RED).addField(MESSAGE_4,MESSAGE_7,false);
@@ -811,13 +781,12 @@ public class BotLogic{
             evt.deferReply(false).queue(hook->{
                 try{
                     int clanId=evt.getOption(FIELD_HEADER_15_1).getAsInt();
-                    String realm=evt.getOption(FIELD_HEADER_15_2).getAsString().toUpperCase();
-                    
                     if(clanId!=0){
-                        double val=ba.getTeamWinrate(clanId,realm);
+                        double val=ba.getTeamWinrate(clanId);
                         if(val!=0.0){
                             eb.setColor(Color.GREEN)
                                     .setTitle("Your team win rate is:")
+                                    .addField("Team:",gd.checkClantagByID(clanId),false)
                                     .addField("Original:",val+"%",false)
                                     .addField("Wargaming's page:",Math.round(val)+"%",false);
                         }else{
@@ -832,64 +801,6 @@ public class BotLogic{
                 }
                 hook.sendMessageEmbeds(eb.build()).queue();
             });
-        }
-    }
-
-    protected class CommandActions{
-        private MessageEmbed createTeam(Mvc1 data,Mvc2 data2,String callerId){
-            EmbedBuilder eb=new EmbedBuilder();
-            try{
-                long accId=data.getAcoountId();
-                String player=data.getNickname();
-                long lastBattleTime=data.getLastBattleTime();
-                long updatedAt=data.getUpdatedAt();
-
-                int clanId=data2.getClanId();
-                String clantag=data2.getClantag();
-                String realm=data2.getRealm();
-                long updatedAt2=data2.getUpdatedAt();
-
-                if(accId!=0&&clanId!=0){
-                    boolean userExists=gd.checkUserData(accId,realm);
-                    boolean clanExists=gd.checkClanData(clanId,realm);
-                    boolean teammateExists=gd.checkTeamPlayer(accId,realm);
-
-                    if(!userExists){
-                        id.registerPlayer(accId,player,realm,lastBattleTime,updatedAt);
-                    }
-                    if(!clanExists){
-                        id.setClanInfo(clanId,clantag,realm,updatedAt2);
-                    }
-                    if(!teammateExists){
-                        id.teamRegistration(clanId,accId,callerId,realm);
-                        eb.setColor(Color.GREEN).addField(MESSAGE_5,gd.checkPlayerByID(accId)+" added to the "+clantag+"'s team roster",false);
-                    }else{
-                        eb.setColor(Color.YELLOW).addField(MESSAGE_4,gd.checkPlayerByID(accId)+" is on another team",false);
-                    }
-                    eb.setColor(Color.GREEN).addField(MESSAGE_5,clantag+MESSAGE_8,false);
-                }else{
-                    eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE_6,false);
-                }
-            }catch(Exception e){
-                eb.setColor(Color.RED).addField(MESSAGE_4,MESSAGE_7,false);
-                uc.log(Level.SEVERE,e.getMessage(),e);
-            }
-            return eb.build();
-        }
-
-        private MessageEmbed playerWeight(long accId){
-            EmbedBuilder eb=new EmbedBuilder();
-            try{
-                if(accId!=0){
-                    eb.setColor(Color.GREEN).addField("Your win rate using Wargaming's tournament formula is:",ba.calculatePlayerWeight(accId)+"%",false);
-                }else{
-                    eb.setColor(Color.YELLOW).addField(MESSAGE_4,MESSAGE_6,false);
-                }
-            }catch(Exception e){
-                eb.setColor(Color.RED).addField(MESSAGE_4,MESSAGE_7,false);
-                uc.log(Level.SEVERE,e.getMessage(),e);
-            }
-            return eb.build();
         }
     }
 }

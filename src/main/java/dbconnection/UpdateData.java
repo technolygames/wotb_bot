@@ -30,13 +30,13 @@ public class UpdateData{
     }
     
     /**
-     * @param lastTimeBattle last_battle_time
-     * @param updatedAt update_at
+     * @param lastTimeBattle
+     * @param updatedAt
      * @param accId
      */
     public void updateUserTimestamps(long lastTimeBattle,long updatedAt,long accId){
         try(Connection cn=new DbConnection().getConnection();
-                PreparedStatement ps2=cn.prepareStatement("update user_data set last_battle_time=?, updated_at=? where wotb_id=?")){
+                PreparedStatement ps2=cn.prepareStatement("update user_data set last_battle_time=?,updated_at=? where wotb_id=?")){
             ps2.setLong(1,lastTimeBattle);
             ps2.setLong(2,updatedAt);
             ps2.setLong(3,accId);
@@ -64,14 +64,12 @@ public class UpdateData{
     /**
      * @param clantag
      * @param clanId
-     * @param realm
      */
-    public void updateClantag(String clantag,int clanId,String realm){
+    public void updateClantag(String clantag,int clanId){
         try(Connection cn=new DbConnection().getConnection();
-                PreparedStatement ps=cn.prepareStatement("update clan_data set clantag=? where clan_id=? and realm=?")){
+                PreparedStatement ps=cn.prepareStatement("update clan_data set clantag=? where clan_id=?")){
             ps.setString(1,clantag);
             ps.setInt(2,clanId);
-            ps.setString(3,realm);
             ps.executeUpdate();
         }catch(SQLException e){
             uc.log(Level.SEVERE,e.getMessage(),e);
